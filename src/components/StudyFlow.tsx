@@ -86,12 +86,12 @@ export default function StudyFlow() {
 
   return (
     <div
-      className="w-full min-h-screen p-6 transition-colors duration-300"
+      className="w-full min-h-screen p-4 sm:p-6 transition-colors duration-300"
       style={{ background: "var(--paper)", color: "var(--ink)" }}
     >
       <div className="max-w-2xl mx-auto">
         {/* ─── Header ─────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           {/* City dropdown (top-right in RTL = appears on the right) */}
           <select
             id="city-select"
@@ -139,7 +139,7 @@ export default function StudyFlow() {
 
         {/* ─── Task Input ─────────────────────────────────────────── */}
         <div
-          className="rounded-lg border px-4 py-3 mb-6 flex items-center gap-2"
+          className="rounded-lg border px-3 py-2 sm:px-4 sm:py-3 mb-6 flex items-center gap-2"
           style={{
             background: "var(--card)",
             borderColor: "var(--line)",
@@ -157,7 +157,7 @@ export default function StudyFlow() {
             }}
             onKeyDown={handleKeyDown}
             placeholder="اكتب مهامك اليوم كما تحدّث صديقاً..."
-            className="flex-1 bg-transparent outline-none text-base placeholder:opacity-60"
+            className="flex-1 bg-transparent outline-none text-sm sm:text-base placeholder:opacity-60"
             style={{ color: "var(--ink)" }}
             dir="rtl"
           />
@@ -165,7 +165,7 @@ export default function StudyFlow() {
             id="organize-btn"
             onClick={handleOrganize}
             disabled={loading}
-            className="text-xs px-3 py-1.5 rounded-md border flex items-center gap-1 hover:opacity-80 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="shrink-0 text-xs sm:text-sm px-3 py-1.5 sm:px-4 sm:py-2 rounded-md border flex items-center gap-1 hover:opacity-80 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               background: "var(--paper)",
               borderColor: "var(--line)",

@@ -83,7 +83,7 @@ export default function FocusTimer({ label, onClose }: FocusTimerProps) {
       style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
     >
       <div
-        className="timer-modal relative rounded-2xl p-8 w-full max-w-sm mx-4"
+        className="timer-modal relative rounded-2xl p-6 sm:p-8 w-full max-w-sm mx-4"
         style={{
           background: "var(--card)",
           border: "1px solid var(--line)",

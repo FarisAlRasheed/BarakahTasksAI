@@ -42,7 +42,7 @@ export default function TimelineCard({
 
   return (
     <div
-      className="timeline-item animate-fade-in-up opacity-0 rounded-lg border px-4 py-3 mb-2 flex items-center gap-3 group"
+      className="timeline-item animate-fade-in-up opacity-0 rounded-lg border px-3 sm:px-4 py-3 mb-2 flex items-center gap-3 group"
       style={{
         background: "var(--card)",
         borderColor: "var(--line)",
@@ -94,7 +94,7 @@ export default function TimelineCard({
 
       {/* Time display */}
       <div
-        className="text-sm font-bold flex-shrink-0"
+        className="text-xs sm:text-sm font-bold flex-shrink-0 whitespace-nowrap"
         style={{ color: isPrayer ? "var(--gold)" : "var(--ink)" }}
       >
         {formatTimeArabic(item.startTime)}
