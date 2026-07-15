@@ -1,0 +1,152 @@
+@import "tailwindcss";
+
+/* ─── Parchment / Manuscript Color System ─────────────────────────── */
+
+:root {
+  --paper: #F3E9D2;
+  --card: #EBDFC0;
+  --ink: #3B2A1A;
+  --ink-soft: #6B5842;
+  --gold: #8C6A3F;
+  --line: #C9B98E;
+  --accent-glow: rgba(140, 106, 63, 0.15);
+}
+
+.dark {
+  --paper: #2A2118;
+  --card: #352A1E;
+  --ink: #EAD9B5;
+  --ink-soft: #B8A582;
+  --gold: #C9A15C;
+  --line: #4A3B29;
+  --accent-glow: rgba(201, 161, 92, 0.1);
+}
+
+/* ─── Tailwind v4 Theme Integration ───────────────────────────────── */
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-gold: var(--gold);
+  --color-line: var(--line);
+  --color-accent-glow: var(--accent-glow);
+  --font-amiri: var(--font-amiri);
+  --font-aref: var(--font-aref-ruqaa);
+}
+
+/* ─── Base Styles ─────────────────────────────────────────────────── */
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-amiri), "Amiri", serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ─── Smooth Color Transitions ────────────────────────────────────── */
+
+*, *::before, *::after {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+/* ─── Scrollbar Styling ───────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--paper);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gold);
+}
+
+/* ─── Selection Color ─────────────────────────────────────────────── */
+
+::selection {
+  background: var(--gold);
+  color: var(--paper);
+}
+
+/* ─── Animations ──────────────────────────────────────────────────── */
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% { opacity: 0.5; }
+  50% { opacity: 1; }
+  100% { opacity: 0.5; }
+}
+
+@keyframes pulse-gold {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  50% { box-shadow: 0 0 0 8px transparent; }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s ease-out forwards;
+}
+
+.animate-shimmer {
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+.animate-pulse-gold {
+  animation: pulse-gold 2s ease-in-out infinite;
+}
+
+/* Staggered animation delays for timeline items */
+.timeline-item:nth-child(1) { animation-delay: 0.05s; }
+.timeline-item:nth-child(2) { animation-delay: 0.1s; }
+.timeline-item:nth-child(3) { animation-delay: 0.15s; }
+.timeline-item:nth-child(4) { animation-delay: 0.2s; }
+.timeline-item:nth-child(5) { animation-delay: 0.25s; }
+.timeline-item:nth-child(6) { animation-delay: 0.3s; }
+.timeline-item:nth-child(7) { animation-delay: 0.35s; }
+.timeline-item:nth-child(8) { animation-delay: 0.4s; }
+.timeline-item:nth-child(9) { animation-delay: 0.45s; }
+.timeline-item:nth-child(10) { animation-delay: 0.5s; }
+
+/* ─── Focus Timer Overlay ─────────────────────────────────────────── */
+
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.timer-overlay {
+  animation: overlayIn 0.2s ease-out;
+}
+
+.timer-modal {
+  animation: modalIn 0.3s ease-out;
+}
