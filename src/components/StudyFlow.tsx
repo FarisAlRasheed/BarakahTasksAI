@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Moon, Sun, Feather, Sparkles, Loader2, Plus, X, AlertCircle, Send, MessageCircle, Settings, ChevronDown } from "lucide-react";
+import { Moon, Sun, Feather, Sparkles, Loader2, Plus, X, AlertCircle, Send, MessageCircle, Settings, ChevronDown, Star } from "lucide-react";
 import { SAUDI_CITIES, findCity } from "@/lib/cities";
 import { sortBlocks, hasOverlap, type TimeBlock } from "@/lib/schedule";
 import { type ChatTask } from "@/lib/chat";
+import { BARAKAH_OPTIONS, computeBarakahBlock } from "@/lib/barakah";
 import TimelineCard from "./TimelineCard";
 import FocusTimer from "./FocusTimer";
 import { useAutoAnimate } from "@formkit/auto-animate/react";
@@ -39,6 +40,11 @@ export default function StudyFlow() {
   const [formType, setFormType] = useState<"study" | "sleep" | "workout" | "meeting" | "prayer">("study");
   const [formColor, setFormColor] = useState<string>("default");
   const [hasConflict, setHasConflict] = useState(false);
+
+  // ─── Barakah Quick-Add Menu State ─────────────────────────────────
+  const [isBarakahOpen, setIsBarakahOpen] = useState(false);
+  const [barakahError, setBarakahError] = useState<string | null>(null);
+  const barakahRef = useRef<HTMLDivElement>(null);
 
   // Auto Animate ref for smooth list transitions
   const [parentRef] = useAutoAnimate<HTMLDivElement>();
@@ -84,6 +90,34 @@ export default function StudyFlow() {
     const overlap = prayers.some((prayer) => hasOverlap(tempBlock, prayer, 30));
     setHasConflict(overlap);
   }, [formStartTime, formEndTime, formType, scheduleItems, isModalOpen, formLabel, formSub]);
+
+  // ─── Barakah Quick-Add Handler ─────────────────────────────────────
+  const handleAddBarakah = useCallback(
+    (option: (typeof BARAKAH_OPTIONS)[number]) => {
+      const prayerBlocks = scheduleItems.filter((item) => item.type === "prayer");
+      const newBlock = computeBarakahBlock(option, prayerBlocks);
+
+      if (!newBlock) {
+        setBarakahError("لم يتم العثور على وقت الصلاة المناسب لهذه العبادة");
+        return;
+      }
+
+      setBarakahError(null);
+      setScheduleItems((prev) => sortBlocks([...prev, newBlock]));
+    },
+    [scheduleItems]
+  );
+
+  // Close barakah menu on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (barakahRef.current && !barakahRef.current.contains(event.target as Node)) {
+        setIsBarakahOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // ─── Dark Mode Toggle ────────────────────────────────────────────
   const toggleDark = useCallback(() => {
@@ -437,6 +471,60 @@ export default function StudyFlow() {
               >
                 <Plus size={12} /> إضافة مهمة
               </button>
+
+              {/* بركة — Quick-add worship options */}
+              <div className="relative" ref={barakahRef}>
+                <button
+                  onClick={() => setIsBarakahOpen((prev) => !prev)}
+                  className="text-xs px-2.5 py-1.5 rounded-md border flex items-center gap-1 hover:opacity-85 transition-all duration-200 hover:scale-105 cursor-pointer"
+                  style={{
+                    background: "var(--color-sage)",
+                    borderColor: "var(--color-sage)",
+                    color: "var(--paper)",
+                  }}
+                >
+                  <Star size={12} /> بركة
+                </button>
+
+                {isBarakahOpen && (
+                  <div
+                    className="absolute left-0 top-full mt-2 w-64 rounded-lg border shadow-lg overflow-hidden animate-fade-in-up"
+                    style={{ background: "var(--card)", borderColor: "var(--line)", zIndex: 100 }}
+                    dir="rtl"
+                  >
+                    <div
+                      className="px-3 py-2 text-xs font-bold border-b"
+                      style={{ color: "var(--ink-soft)", borderColor: "var(--line)" }}
+                    >
+                      إضافة عبادة إلى الجدول
+                    </div>
+                    <div className="max-h-72 overflow-y-auto custom-scrollbar">
+                      {BARAKAH_OPTIONS.map((option) => (
+                        <button
+                          key={option.id}
+                          onClick={() => handleAddBarakah(option)}
+                          className="w-full text-right px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer flex flex-col"
+                          style={{ color: "var(--ink)" }}
+                        >
+                          <span className="font-bold">{option.label}</span>
+                          <span className="text-xs" style={{ color: "var(--ink-soft)" }}>
+                            {option.sub} · {option.duration} د
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    {barakahError && (
+                      <div
+                        className="px-3 py-2 text-xs border-t"
+                        style={{ color: "#dc2626", borderColor: "var(--line)" }}
+                      >
+                        {barakahError}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <button
                 onClick={() => {
                   if (confirm("هل تريد مسح الجدول الزمني بالكامل؟")) {
