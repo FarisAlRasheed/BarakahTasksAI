@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Moon, Sun, Feather, Sparkles, Loader2, Plus, X, AlertCircle, Send, MessageCircle } from "lucide-react";
-import { SAUDI_CITIES } from "@/lib/cities";
+import { Moon, Sun, Feather, Sparkles, Loader2, Plus, X, AlertCircle, Send, MessageCircle, Settings, ChevronDown } from "lucide-react";
+import { SAUDI_CITIES, findCity } from "@/lib/cities";
 import { sortBlocks, hasOverlap, type TimeBlock } from "@/lib/schedule";
 import { type ChatTask } from "@/lib/chat";
 import TimelineCard from "./TimelineCard";
 import FocusTimer from "./FocusTimer";
+import { useAutoAnimate } from "@formkit/auto-animate/react";
+import BackgroundElements from "./BackgroundElements";
+import TimeRangeSlider from "./TimeRangeSlider";
 
 export default function StudyFlow() {
   // ─── State ───────────────────────────────────────────────────────
@@ -33,8 +36,12 @@ export default function StudyFlow() {
   const [formSub, setFormSub] = useState("");
   const [formStartTime, setFormStartTime] = useState("08:00");
   const [formEndTime, setFormEndTime] = useState("09:00");
-  const [formType, setFormType] = useState<"study" | "sleep">("study");
+  const [formType, setFormType] = useState<"study" | "sleep" | "workout" | "meeting" | "prayer">("study");
+  const [formColor, setFormColor] = useState<string>("default");
   const [hasConflict, setHasConflict] = useState(false);
+
+  // Auto Animate ref for smooth list transitions
+  const [parentRef] = useAutoAnimate<HTMLDivElement>();
 
   // ─── LocalStorage Persistence ────────────────────────────────────
   // Load from localStorage on mount
@@ -186,6 +193,7 @@ export default function StudyFlow() {
     setFormStartTime("08:00");
     setFormEndTime("09:00");
     setFormType("study");
+    setFormColor("default");
     setIsModalOpen(true);
   }, []);
 
@@ -196,7 +204,8 @@ export default function StudyFlow() {
     setFormSub(item.sub || "");
     setFormStartTime(item.startTime);
     setFormEndTime(item.endTime);
-    setFormType(item.type as "study" | "sleep");
+    setFormType(item.type as "study" | "sleep" | "workout" | "meeting" | "prayer");
+    setFormColor(item.color || "default");
     setIsModalOpen(true);
   }, [scheduleItems]);
 
@@ -210,6 +219,7 @@ export default function StudyFlow() {
       endTime: formEndTime,
       sub: formSub.trim() || undefined,
       completed: editingIndex !== null ? scheduleItems[editingIndex].completed : false,
+      color: formColor === "default" ? undefined : formColor,
     };
 
     let updated: TimeBlock[];
@@ -221,7 +231,7 @@ export default function StudyFlow() {
 
     setScheduleItems(sortBlocks(updated));
     setIsModalOpen(false);
-  }, [formLabel, formSub, formStartTime, formEndTime, formType, editingIndex, scheduleItems]);
+  }, [formLabel, formSub, formStartTime, formEndTime, formType, formColor, editingIndex, scheduleItems]);
 
   const handleToggleComplete = useCallback((index: number) => {
     setScheduleItems((prev) =>
@@ -239,13 +249,15 @@ export default function StudyFlow() {
 
   // ─── Keyboard Shortcut ───────────────────────────────────────────
   // Handled inside the textarea for chat directly.
+  const cityEn = findCity(city)?.nameEn || "Riyadh";
 
   return (
     <div
-      className="w-full min-h-screen p-4 sm:p-6 transition-colors duration-300"
-      style={{ background: "var(--paper)", color: "var(--ink)" }}
+      className="w-full min-h-screen p-4 sm:p-6 transition-colors duration-300 relative z-0"
+      style={{ background: "transparent", color: "var(--ink)" }}
     >
-      <div className="max-w-2xl mx-auto">
+      <BackgroundElements cityEn={cityEn} />
+      <div className="max-w-2xl mx-auto relative z-10">
         {/* ─── Header ─────────────────────────────────────────────── */}
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           {/* City dropdown */}
@@ -472,7 +484,7 @@ export default function StudyFlow() {
 
         {/* ─── Timeline ───────────────────────────────────────────── */}
         {!loading && scheduleItems.length > 0 && (
-          <div>
+          <div ref={parentRef}>
             {scheduleItems.map((item, i) => (
               <TimelineCard
                 key={`${item.startTime}-${item.label}-${i}`}
@@ -516,6 +528,9 @@ export default function StudyFlow() {
               border: "1px solid var(--line)",
               color: "var(--ink)",
             }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSaveTask();
+            }}
           >
             {/* Close button */}
             <button
@@ -544,10 +559,11 @@ export default function StudyFlow() {
                 value={formLabel}
                 onChange={(e) => setFormLabel(e.target.value)}
                 placeholder="مثال: مراجعة الرياضيات"
-                className="w-full text-right px-3 py-2 text-sm rounded-md border outline-none bg-transparent"
+                className="w-full text-right px-3 py-2 text-sm rounded-md border outline-none bg-transparent focus:ring-2 focus:ring-opacity-50 transition-all duration-300"
                 style={{ borderColor: "var(--line)", color: "var(--ink)" }}
                 dir="rtl"
                 required
+                autoFocus
               />
             </div>
 
@@ -561,54 +577,74 @@ export default function StudyFlow() {
                 value={formSub}
                 onChange={(e) => setFormSub(e.target.value)}
                 placeholder="مثال: التركيز على الفصل الأول"
-                className="w-full text-right px-3 py-2 text-sm rounded-md border outline-none bg-transparent"
+                className="w-full text-right px-3 py-2 text-sm rounded-md border outline-none bg-transparent focus:ring-2 focus:ring-opacity-50 transition-all duration-300"
                 style={{ borderColor: "var(--line)", color: "var(--ink)" }}
                 dir="rtl"
               />
             </div>
 
             {/* Type selection */}
-            <div className="mb-4 text-right">
+            <div className="mb-4 text-right relative">
               <label className="block text-xs mb-1 font-bold" style={{ color: "var(--ink-soft)" }}>
                 النوع
               </label>
               <select
                 value={formType}
-                onChange={(e) => setFormType(e.target.value as "study" | "sleep")}
-                className="w-full text-right px-3 py-2 text-sm rounded-md border outline-none bg-transparent cursor-pointer"
+                onChange={(e) => setFormType(e.target.value as "study" | "sleep" | "workout" | "meeting" | "prayer")}
+                className="w-full text-right px-3 py-2 text-sm rounded-md border outline-none bg-transparent cursor-pointer appearance-none"
                 style={{ borderColor: "var(--line)", color: "var(--ink)", background: "var(--card)" }}
                 dir="rtl"
               >
                 <option value="study">دراسة 📖</option>
                 <option value="sleep">نوم 🛌</option>
+                <option value="workout">نشاط بدني 🏋️</option>
+                <option value="meeting">اجتماع ☕️</option>
+                <option value="prayer">صلاة 🕌</option>
               </select>
+              <ChevronDown className="absolute left-3 top-9 opacity-50 pointer-events-none" size={14} />
             </div>
 
-            {/* Start and End Times Grid */}
-            <div className="grid grid-cols-2 gap-4 mb-6 text-right" dir="rtl">
-              <div>
-                <label className="block text-xs mb-1 font-bold" style={{ color: "var(--ink-soft)" }}>
-                  وقت البدء
-                </label>
-                <input
-                  type="time"
-                  value={formStartTime}
-                  onChange={(e) => setFormStartTime(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-md border outline-none bg-transparent text-center"
-                  style={{ borderColor: "var(--line)", color: "var(--ink)" }}
-                />
-              </div>
-              <div>
-                <label className="block text-xs mb-1 font-bold" style={{ color: "var(--ink-soft)" }}>
-                  وقت الانتهاء
-                </label>
-                <input
-                  type="time"
-                  value={formEndTime}
-                  onChange={(e) => setFormEndTime(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-md border outline-none bg-transparent text-center"
-                  style={{ borderColor: "var(--line)", color: "var(--ink)" }}
-                />
+            {/* Time Slider */}
+            <div className="mb-6 text-right" dir="rtl">
+              <label className="block text-xs mb-1 font-bold" style={{ color: "var(--ink-soft)" }}>
+                وقت المهمة
+              </label>
+              <TimeRangeSlider
+                startTime={formStartTime}
+                endTime={formEndTime}
+                onChange={(start, end) => {
+                  setFormStartTime(start);
+                  setFormEndTime(end);
+                }}
+              />
+            </div>
+
+            {/* Color Picker */}
+            <div className="mb-6 text-right">
+              <label className="block text-xs mb-2 font-bold" style={{ color: "var(--ink-soft)" }}>
+                لون المهمة
+              </label>
+              <div className="flex items-center justify-end gap-3" dir="rtl">
+                {[
+                  { value: "default", label: "تلقائي", color: "var(--card)" },
+                  { value: "sage", label: "زيتوني", color: "var(--color-sage)" },
+                  { value: "terracotta", label: "طوبي", color: "var(--color-terracotta)" },
+                  { value: "dustyblue", label: "أزرق رمادي", color: "var(--color-dustyblue)" },
+                ].map((c) => (
+                  <button
+                    key={c.value}
+                    onClick={() => setFormColor(c.value)}
+                    className={`w-8 h-8 rounded-full border-2 transition-all duration-200 cursor-pointer ${
+                      formColor === c.value ? "scale-110 shadow-md border-opacity-100" : "hover:scale-105 border-opacity-50 opacity-80 hover:opacity-100"
+                    }`}
+                    style={{
+                      background: c.color,
+                      borderColor: formColor === c.value ? "var(--ink)" : "var(--line)",
+                    }}
+                    title={c.label}
+                    aria-label={`اختيار اللون ${c.label}`}
+                  />
+                ))}
               </div>
             </div>
 
@@ -635,18 +671,18 @@ export default function StudyFlow() {
               <button
                 onClick={handleSaveTask}
                 disabled={!formLabel.trim()}
-                className="px-5 py-2 rounded-lg border text-sm font-bold hover:opacity-80 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-[2] px-5 py-2 rounded-lg border text-sm font-bold hover:opacity-80 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background: "var(--gold)",
                   borderColor: "var(--gold)",
                   color: "var(--paper)",
                 }}
               >
-                حفظ
+                حفظ المهمة
               </button>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="px-5 py-2 rounded-lg border text-sm font-bold hover:opacity-80 transition-opacity cursor-pointer"
+                className="flex-1 px-5 py-2 rounded-lg border text-sm font-bold hover:opacity-80 transition-opacity cursor-pointer"
                 style={{
                   background: "var(--paper)",
                   borderColor: "var(--line)",
