@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Moon, Sun, Feather, Sparkles, Loader2, Plus, X, AlertCircle, Send, MessageCircle, Settings, ChevronDown, Star } from "lucide-react";
+import { Moon, Sun, Feather, Sparkles, Loader2, Plus, X, AlertCircle, Send, MessageCircle, Settings, ChevronDown, Star, Printer, Award } from "lucide-react";
 import { SAUDI_CITIES, findCity } from "@/lib/cities";
-import { sortBlocks, hasOverlap, type TimeBlock } from "@/lib/schedule";
+import { sortBlocks, hasOverlap, parseTime, type TimeBlock } from "@/lib/schedule";
 import { type ChatTask } from "@/lib/chat";
 import { BARAKAH_OPTIONS, computeBarakahBlock } from "@/lib/barakah";
 import TimelineCard from "./TimelineCard";
@@ -11,6 +11,7 @@ import FocusTimer from "./FocusTimer";
 import { useAutoAnimate } from "@formkit/auto-animate/react";
 import BackgroundElements from "./BackgroundElements";
 import TimeRangeSlider from "./TimeRangeSlider";
+import DhikrCounter from "./DhikrCounter";
 
 export default function StudyFlow() {
   // ─── State ───────────────────────────────────────────────────────
@@ -29,6 +30,7 @@ export default function StudyFlow() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [timerLabel, setTimerLabel] = useState<string | null>(null);
+  const [isDhikrOpen, setIsDhikrOpen] = useState(false);
 
   // ─── Add/Edit Task Modal State ────────────────────────────────────
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -45,6 +47,15 @@ export default function StudyFlow() {
   const [isBarakahOpen, setIsBarakahOpen] = useState(false);
   const [barakahError, setBarakahError] = useState<string | null>(null);
   const barakahRef = useRef<HTMLDivElement>(null);
+
+  // Filter state
+  const [filterType, setFilterType] = useState<string>("all");
+
+  // Current time for timeline indicator
+  const [currentTime, setCurrentTime] = useState(() => {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  });
 
   // Auto Animate ref for smooth list transitions
   const [parentRef] = useAutoAnimate<HTMLDivElement>();
@@ -70,6 +81,15 @@ export default function StudyFlow() {
       localStorage.removeItem("barakah_schedule_items");
     }
   }, [scheduleItems]);
+
+  // Update current time every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date();
+      setCurrentTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // ─── Conflict Check inside Modal ──────────────────────────────────
   useEffect(() => {
@@ -267,13 +287,45 @@ export default function StudyFlow() {
     setIsModalOpen(false);
   }, [formLabel, formSub, formStartTime, formEndTime, formType, formColor, editingIndex, scheduleItems]);
 
+  // Web Audio Synth Chime for task completion
+  const playCompletionSound = useCallback(() => {
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+      osc.frequency.exponentialRampToValueAtTime(659.25, ctx.currentTime + 0.15); // E5
+      osc.frequency.exponentialRampToValueAtTime(783.99, ctx.currentTime + 0.3); // G5
+      
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      
+      osc.start();
+      osc.stop(ctx.currentTime + 0.45);
+    } catch {
+      // Audio context may be restricted by browser policy
+    }
+  }, []);
+
   const handleToggleComplete = useCallback((index: number) => {
     setScheduleItems((prev) =>
-      prev.map((item, idx) =>
-        idx === index ? { ...item, completed: !item.completed } : item
-      )
+      prev.map((item, idx) => {
+        if (idx === index) {
+          const willComplete = !item.completed;
+          if (willComplete) playCompletionSound();
+          return { ...item, completed: willComplete };
+        }
+        return item;
+      })
     );
-  }, []);
+  }, [playCompletionSound]);
 
   const handleDelete = useCallback((index: number) => {
     if (confirm("هل أنت متأكد من حذف هذه المهمة؟")) {
@@ -293,45 +345,63 @@ export default function StudyFlow() {
       <BackgroundElements cityEn={cityEn} />
       <div className="max-w-2xl mx-auto relative z-10">
         {/* ─── Header ─────────────────────────────────────────────── */}
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-          {/* City dropdown */}
-          <select
-            id="city-select"
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            className="text-sm px-3 py-2 rounded-md border outline-none cursor-pointer hover:opacity-80 transition-opacity"
-            style={{
-              background: "var(--card)",
-              borderColor: "var(--line)",
-              color: "var(--ink-soft)",
-            }}
-          >
-            {SAUDI_CITIES.map((c) => (
-              <option key={c.nameAr} value={c.nameAr}>
-                {c.nameAr}
-              </option>
-            ))}
-          </select>
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-8 p-3 sm:p-4 rounded-2xl border backdrop-blur-md shadow-sm transition-all duration-300 hover:shadow-md"
+          style={{ background: "var(--card)", borderColor: "var(--line)" }}
+        >
+          {/* City dropdown + Subha button */}
+          <div className="flex items-center gap-2">
+            <select
+              id="city-select"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              className="text-xs sm:text-sm px-3 py-2 rounded-xl border outline-none cursor-pointer hover:opacity-85 transition-all duration-200"
+              style={{
+                background: "var(--paper)",
+                borderColor: "var(--line)",
+                color: "var(--ink)",
+              }}
+            >
+              {SAUDI_CITIES.map((c) => (
+                <option key={c.nameAr} value={c.nameAr}>
+                  📍 {c.nameAr}
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={() => setIsDhikrOpen(true)}
+              className="text-xs px-3 py-2 rounded-xl border flex items-center gap-1 hover:opacity-85 transition-all duration-200 hover:scale-105 cursor-pointer shadow-sm"
+              style={{
+                background: "var(--paper)",
+                borderColor: "var(--line)",
+                color: "var(--ink)",
+              }}
+              title="افتـح السبحة الإلكترونية"
+            >
+              📿 السبحة
+            </button>
+          </div>
 
           {/* Site name + dark mode toggle */}
           <div className="flex items-center gap-3">
             <button
               onClick={toggleDark}
               aria-label="تبديل الوضع"
-              className="text-xs px-3 py-1.5 rounded-md border hover:opacity-80 transition-all duration-200 hover:scale-105 cursor-pointer"
+              className="text-xs p-2 sm:px-3 sm:py-2 rounded-xl border hover:opacity-85 transition-all duration-200 hover:scale-105 cursor-pointer shadow-sm"
               style={{
-                background: "var(--card)",
+                background: "var(--paper)",
                 borderColor: "var(--line)",
                 color: "var(--ink)",
               }}
             >
-              {dark ? <Sun size={14} /> : <Moon size={14} />}
+              {dark ? <Sun size={15} /> : <Moon size={15} />}
             </button>
             <span
-              className="text-2xl font-bold"
+              className="text-2xl sm:text-3xl font-bold tracking-wide"
               style={{
                 color: "var(--gold)",
                 fontFamily: "var(--font-aref-ruqaa), 'Aref Ruqaa', serif",
+                textShadow: "0 2px 10px rgba(187, 170, 136, 0.2)",
               }}
             >
               سِجل الدراسة
@@ -347,7 +417,9 @@ export default function StudyFlow() {
                 {messages.map((msg, i) => (
                   <div key={i} className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`} dir="rtl">
                     <div 
-                      className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${msg.role === 'user' ? 'rounded-tr-none' : 'rounded-tl-none'}`}
+                      className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-sm transition-all ${
+                        msg.role === 'user' ? 'rounded-tr-none' : 'rounded-tl-none backdrop-blur-sm'
+                      }`}
                       style={{
                         background: msg.role === 'user' ? 'var(--gold)' : 'var(--card)',
                         color: msg.role === 'user' ? 'var(--paper)' : 'var(--ink)',
@@ -361,11 +433,11 @@ export default function StudyFlow() {
                 ))}
                 {chatLoading && (
                   <div className="flex justify-end" dir="rtl">
-                    <div className="max-w-[85%] rounded-2xl rounded-tl-none px-4 py-3 text-sm flex items-center gap-2"
+                    <div className="max-w-[85%] rounded-2xl rounded-tl-none px-4 py-3 text-sm flex items-center gap-2 shadow-sm"
                       style={{ background: 'var(--card)', border: '1px solid var(--line)' }}
                     >
-                      <Loader2 size={16} className="animate-spin opacity-50" />
-                      <span className="opacity-50">يتم تحديث المهام...</span>
+                      <Loader2 size={16} className="animate-spin opacity-60" style={{ color: "var(--gold)" }} />
+                      <span className="opacity-70 font-semibold">يتم تحديث المهام...</span>
                     </div>
                   </div>
                 )}
@@ -373,8 +445,32 @@ export default function StudyFlow() {
               </div>
             )}
 
+            {/* Quick Suggestion Chips */}
+            <div className="flex items-center gap-1.5 sm:gap-2 mb-2.5 overflow-x-auto pb-1 no-scrollbar text-xs" dir="rtl">
+              <span className="text-[11px] opacity-60 font-semibold shrink-0 ml-1">اقتراحات سريعة:</span>
+              {[
+                { label: "مذاكرة 📖", text: "أضف مهمة مذاكرة من 4 م إلى 6 م" },
+                { label: "ورد القرآن 🕌", text: "أضف قراءة قرآن من 5 ص إلى 6 ص" },
+                { label: "تمرين 🏋️", text: "أضف تمريناً رياضياً من 5 م إلى 6 م" },
+                { label: "اجتماع ☕️", text: "أضف اجتماع عمل من 8 م إلى 9 م" },
+              ].map((chip) => (
+                <button
+                  key={chip.label}
+                  onClick={() => setMessageInput(chip.text)}
+                  className="px-2.5 py-1 rounded-full border text-[11px] font-medium shrink-0 transition-all hover:scale-105 hover:border-[var(--gold)] active:scale-95 cursor-pointer shadow-sm"
+                  style={{
+                    background: "var(--card)",
+                    borderColor: "var(--line)",
+                    color: "var(--ink)",
+                  }}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+
             <div
-              className="rounded-lg border px-3 py-2 sm:px-4 sm:py-3 flex items-end gap-2"
+              className="rounded-2xl border px-3 py-2 sm:px-4 sm:py-3 flex items-end gap-2 transition-all duration-300 focus-within:ring-2 focus-within:ring-[var(--gold)]/30 focus-within:border-[var(--gold)] shadow-sm"
               style={{
                 background: "var(--card)",
                 borderColor: "var(--line)",
@@ -384,7 +480,7 @@ export default function StudyFlow() {
               <button
                 onClick={() => handleSendMessage()}
                 disabled={chatLoading || !messageInput.trim()}
-                className="shrink-0 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                className="shrink-0 p-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-all duration-200 hover:scale-110 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100"
                 style={{ color: "var(--gold)" }}
                 aria-label="إرسال"
               >
@@ -403,7 +499,7 @@ export default function StudyFlow() {
                     handleSendMessage();
                   }
                 }}
-                placeholder="اكتب مهامك، عدّلها، أو قل 'رتّب' لإنشاء الجدول..."
+                placeholder="اكتب مهامك، عدّلها، أو اختر من الاقتراحات أعلاه..."
                 className="flex-1 bg-transparent outline-none text-sm sm:text-base placeholder:opacity-60 resize-none max-h-32 min-h-[44px] pt-2"
                 style={{ color: "var(--ink)" }}
                 dir="rtl"
@@ -417,17 +513,18 @@ export default function StudyFlow() {
                 id="organize-btn"
                 onClick={handleOrganize}
                 disabled={loading || draftTasks.length === 0}
-                className="text-xs sm:text-sm px-4 py-2 rounded-md border flex items-center gap-1.5 hover:opacity-80 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-sm"
+                className="text-xs sm:text-sm px-5 py-2.5 rounded-xl border flex items-center gap-2 font-bold hover:opacity-90 transition-all duration-200 hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-md"
                 style={{
                   background: "var(--gold)",
                   borderColor: "var(--gold)",
                   color: "var(--paper)",
+                  boxShadow: "0 4px 14px rgba(187, 170, 136, 0.35)",
                 }}
               >
                 {loading ? (
-                  <>جارٍ الترتيب <Loader2 size={14} className="animate-spin" /></>
+                  <>جارٍ الترتيب <Loader2 size={15} className="animate-spin" /></>
                 ) : (
-                  <>رتّب الجدول النهائي <Sparkles size={14} /></>
+                  <>رتّب الجدول <Sparkles size={15} /></>
                 )}
               </button>
             </div>
@@ -455,11 +552,175 @@ export default function StudyFlow() {
           </div>
         )}
 
+        {/* ─── Inspirational Quranic Verse Banner ───────────────────── */}
+        <div 
+          className="mb-6 p-4 rounded-2xl border text-center relative overflow-hidden backdrop-blur-md shadow-sm"
+          style={{ background: "var(--card)", borderColor: "var(--line)", color: "var(--ink)" }}
+          dir="rtl"
+        >
+          <div className="text-xs opacity-60 font-semibold mb-1 flex items-center justify-center gap-1">
+            <Sparkles size={13} style={{ color: "var(--gold)" }} /> آية ودافع لليوم
+          </div>
+          <p 
+            className="text-lg sm:text-xl font-bold tracking-wide"
+            style={{ fontFamily: "var(--font-aref-ruqaa), 'Aref Ruqaa', serif", color: "var(--gold)" }}
+          >
+            ﴿ وَقُل رَّبِّ زِدْنِي عِلْمًا ﴾
+          </p>
+        </div>
+
+        {/* ─── Daily Progress & Next Prayer Info Bar ────────────────── */}
+        {!loading && scheduleItems.length > 0 && (
+          <div className="mb-6 space-y-3" dir="rtl">
+            {/* Daily Progress Bar */}
+            {(() => {
+              const nonPrayerItems = scheduleItems.filter((item) => item.type !== "prayer");
+              if (nonPrayerItems.length === 0) return null;
+              const completedCount = nonPrayerItems.filter((item) => item.completed).length;
+              const percent = Math.round((completedCount / nonPrayerItems.length) * 100);
+
+              const toArNum = (n: number) => n.toString().replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[parseInt(d)]);
+
+              return (
+                <div 
+                  className="p-3.5 rounded-2xl border backdrop-blur-sm shadow-sm transition-all"
+                  style={{ background: "var(--card)", borderColor: "var(--line)" }}
+                >
+                  <div className="flex items-center justify-between text-xs font-bold mb-2">
+                    <span style={{ color: "var(--ink)" }}>
+                      نسبة إنجاز المهام اليومية 🎯
+                    </span>
+                    <span style={{ color: "var(--gold)" }}>
+                      {toArNum(completedCount)} من {toArNum(nonPrayerItems.length)} ({toArNum(percent)}٪)
+                    </span>
+                  </div>
+                  <div className="w-full h-2.5 rounded-full overflow-hidden" style={{ background: "var(--paper)" }}>
+                    <div 
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ 
+                        width: `${percent}%`, 
+                        background: percent === 100 ? "var(--color-prayer)" : "var(--gold)",
+                        boxShadow: "0 0 10px rgba(187, 170, 136, 0.4)"
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Next Prayer Countdown Badge */}
+            {(() => {
+              const currentMins = parseTime(currentTime);
+              const upcomingPrayers = scheduleItems.filter(
+                (item) => item.type === "prayer" && parseTime(item.startTime) > currentMins
+              );
+              if (upcomingPrayers.length === 0) return null;
+              const nextPrayer = upcomingPrayers[0];
+              const diffMins = parseTime(nextPrayer.startTime) - currentMins;
+              const hours = Math.floor(diffMins / 60);
+              const mins = diffMins % 60;
+
+              const toArNum = (n: number) => n.toString().replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[parseInt(d)]);
+              let timeText = "";
+              if (hours > 0) {
+                timeText = `بعد ${toArNum(hours)} ساعة و ${toArNum(mins)} دقيقة`;
+              } else {
+                timeText = `بعد ${toArNum(mins)} دقيقة`;
+              }
+
+              return (
+                <div 
+                  className="px-4 py-2.5 rounded-xl border flex items-center justify-between text-xs font-bold shadow-sm"
+                  style={{ 
+                    background: "rgba(130, 166, 146, 0.12)", 
+                    borderColor: "var(--color-prayer)",
+                    color: "var(--ink)"
+                  }}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Moon size={14} style={{ color: "var(--color-prayer)" }} />
+                    {nextPrayer.label}
+                  </span>
+                  <span className="opacity-80" style={{ color: "var(--color-prayer)" }}>
+                    {timeText}
+                  </span>
+                </div>
+              );
+            })()}
+
+            {/* 100% Completion Celebration Banner */}
+            {(() => {
+              const nonPrayerItems = scheduleItems.filter((item) => item.type !== "prayer");
+              if (nonPrayerItems.length === 0) return null;
+              const allDone = nonPrayerItems.every((item) => item.completed);
+              if (!allDone) return null;
+
+              return (
+                <div 
+                  className="p-4 rounded-2xl border flex items-center justify-between animate-fade-in-up shadow-md"
+                  style={{ 
+                    background: "rgba(187, 170, 136, 0.15)", 
+                    borderColor: "var(--gold)",
+                    color: "var(--ink)"
+                  }}
+                >
+                  <div className="flex items-center gap-2 text-sm font-bold">
+                    <Award size={20} style={{ color: "var(--gold)" }} />
+                    <span>ما شاء الله! أنجزت جميع مهامك اليوم بنجاح 🎉</span>
+                  </div>
+                  <span className="text-xs opacity-80 font-medium">بارك الله في وقتك!</span>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
         {/* ─── Timeline Header & Controls ─────────────────────────── */}
-        <div className="flex items-center justify-between mb-3 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 text-sm" dir="rtl">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-xs sm:text-sm" style={{ color: "var(--ink-soft)" }}>جدول اليوم</span>
+            
+            {/* Category Filter Chips */}
+            {scheduleItems.length > 0 && (
+              <div className="flex items-center gap-1 overflow-x-auto text-[11px]">
+                {[
+                  { id: "all", label: "الكل" },
+                  { id: "study", label: "دراسة 📖" },
+                  { id: "prayer", label: "صلوات 🕌" },
+                  { id: "workout", label: "رياضة 🏋️" },
+                  { id: "meeting", label: "اجتماعات ☕️" },
+                ].map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setFilterType(cat.id)}
+                    className="px-2 py-0.5 rounded-md transition-all cursor-pointer"
+                    style={{
+                      background: filterType === cat.id ? "var(--gold)" : "var(--card)",
+                      color: filterType === cat.id ? "var(--paper)" : "var(--ink-soft)",
+                      border: "1px solid var(--line)"
+                    }}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <span style={{ color: "var(--ink-soft)" }}>الجدول الزمني — اليوم</span>
           {scheduleItems.length > 0 && !loading && (
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => window.print()}
+                className="text-xs px-2.5 py-1.5 rounded-md border flex items-center gap-1 hover:opacity-85 transition-all duration-200 hover:scale-105 cursor-pointer shadow-sm"
+                style={{
+                  background: "var(--card)",
+                  borderColor: "var(--line)",
+                  color: "var(--ink)",
+                }}
+                title="طباعة الجدول الزمني"
+              >
+                <Printer size={13} /> طباعة
+              </button>
               <button
                 onClick={openAddModal}
                 className="text-xs px-2.5 py-1.5 rounded-md border flex items-center gap-1 hover:opacity-85 transition-all duration-200 hover:scale-105 cursor-pointer"
@@ -572,18 +833,92 @@ export default function StudyFlow() {
 
         {/* ─── Timeline ───────────────────────────────────────────── */}
         {!loading && scheduleItems.length > 0 && (
-          <div ref={parentRef}>
-            {scheduleItems.map((item, i) => (
-              <TimelineCard
-                key={`${item.startTime}-${item.label}-${i}`}
-                item={item}
-                index={i}
-                onStartTimer={handleStartTimer}
-                onToggleComplete={handleToggleComplete}
-                onDelete={handleDelete}
-                onEdit={openEditModal}
-              />
-            ))}
+          <div className="relative" dir="rtl">
+            {/* Vertical timeline line */}
+            <div
+              className="absolute right-5 top-0 bottom-0 w-0.5 rounded-full"
+              style={{ background: "var(--line)" }}
+            />
+
+            {/* Current time indicator */}
+            {(() => {
+              const currentMins = parseTime(currentTime);
+              const firstStart = scheduleItems.length > 0 ? parseTime(scheduleItems[0].startTime) : 0;
+              const lastEnd = scheduleItems.length > 0 ? parseTime(scheduleItems[scheduleItems.length - 1].endTime) : 1440;
+              const totalRange = Math.max(lastEnd - firstStart, 1);
+              const currentPercent = Math.max(0, Math.min(100, ((currentMins - firstStart) / totalRange) * 100));
+              
+              if (currentMins >= firstStart && currentMins <= lastEnd) {
+                const formatNow = (t: string) => {
+                  const [h, m] = t.split(':').map(Number);
+                  const p = h >= 12 ? 'م' : 'ص';
+                  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+                  const toAr = (n: number) => n.toString().replace(/\d/g, (d) => '٠١٢٣٤٥٦٧٨٩'[parseInt(d)]);
+                  return `${toAr(h12)}:${toAr(m).padStart(2, '٠')} ${p}`;
+                };
+                return (
+                  <div
+                    className="absolute right-0 flex items-center z-10 pointer-events-none"
+                    style={{ top: `${currentPercent}%` }}
+                  >
+                    {/* Arrow + line */}
+                    <div className="flex items-center">
+                      <div
+                        className="w-3 h-3 rounded-full border-2 animate-pulse-gold"
+                        style={{ background: "var(--gold)", borderColor: "var(--gold)" }}
+                      />
+                      <div
+                        className="h-0.5 w-8"
+                        style={{ background: "var(--gold)" }}
+                      />
+                    </div>
+                    <span
+                      className="text-[10px] font-bold mr-1 whitespace-nowrap"
+                      style={{ color: "var(--gold)" }}
+                    >
+                      {formatNow(currentTime)}
+                    </span>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            {/* Timeline items */}
+            <div ref={parentRef} className="relative">
+              {scheduleItems
+                .filter((item) => filterType === "all" || item.type === filterType)
+                .map((item, i) => (
+                  <div 
+                    key={`${item.startTime}-${item.label}-${i}`} 
+                    className="flex items-stretch mb-0 relative"
+                    style={{ zIndex: 100 - i }}
+                  >
+                    {/* Right time column */}
+                    <div className="w-10 flex flex-col items-center flex-shrink-0 relative">
+                      {/* Time dot on the line */}
+                      <div
+                        className="w-2.5 h-2.5 rounded-full border-2 mt-5 z-[1]"
+                        style={{
+                          background: item.type === 'prayer' ? 'var(--color-prayer)' : 'var(--card)',
+                          borderColor: item.type === 'prayer' ? 'var(--color-prayer)' : 'var(--gold)',
+                        }}
+                      />
+                    </div>
+                    {/* Card */}
+                    <div className="flex-1 min-w-0">
+                      <TimelineCard
+                        item={item}
+                        index={i}
+                        onStartTimer={handleStartTimer}
+                        onToggleComplete={handleToggleComplete}
+                        onDelete={handleDelete}
+                        onEdit={openEditModal}
+                      />
+                    </div>
+                  </div>
+                ))}
+            </div>
           </div>
         )}
 
@@ -784,9 +1119,14 @@ export default function StudyFlow() {
         </div>
       )}
 
-      {/* ─── Focus Timer Modal ────────────────────────────────────── */}
+      {/* ─── Focus Timer Modal ───────────────────────────────────── */}
       {timerLabel && (
         <FocusTimer label={timerLabel} onClose={handleCloseTimer} />
+      )}
+
+      {/* ─── Dhikr Electronic Subha Modal ──────────────────────────── */}
+      {isDhikrOpen && (
+        <DhikrCounter onClose={() => setIsDhikrOpen(false)} />
       )}
     </div>
   );
