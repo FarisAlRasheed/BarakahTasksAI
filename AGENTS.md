@@ -15,7 +15,7 @@ These rules are **mandatory** for all code in this project. Any PR or commit tha
 The Groq API key (`GROQ_API_KEY`) must **never** be sent to or used in the browser.
 
 - The key is stored in `.env.local` and accessed only via `process.env.GROQ_API_KEY`
-- All Groq API calls happen **exclusively** inside `app/api/schedule/route.ts` (a server-side Route Handler)
+- All Groq API calls happen **exclusively** inside `app/api/schedule/route.ts` and `app/api/chat/route.ts` (server-side Route Handlers)
 - No client component, page, or utility imported by a client component may reference the key
 - The `.env.local` file is listed in `.gitignore` and must never be committed
 
@@ -28,7 +28,12 @@ All incoming user input (`city`, `taskText`) must be validated on the **server s
 - Invalid input returns a 400 response with a descriptive error message
 - Never trust client-side validation alone
 
-## 3. Separation of Scheduling Logic
+## 3. Separation of Routes
+
+- `/api/chat/route.ts`: Handles the conversational turns for building a task list interactively. Maintains statelessness by accepting the previous tasks list from the client.
+- `/api/schedule/route.ts`: Responsible ONLY for generating the final schedule timeline from a finalized task list. Do not merge conversational logic here.
+
+## 4. Separation of Scheduling Logic
 
 Scheduling and merging logic must live in a **separate, pure, testable utility file** (`lib/schedule.ts`).
 

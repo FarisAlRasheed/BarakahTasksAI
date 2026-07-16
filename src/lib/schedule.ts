@@ -139,13 +139,50 @@ export function mergeScheduleWithPrayerTimes(
   prayerTimes: TimeBlock[],
   bufferMinutes: number = 30
 ): TimeBlock[] {
-  // Filter out AI blocks that overlap any prayer's buffer window
-  const safeBlocks = aiBlocks.filter((aiBlock) => {
-    // Check against every prayer time
-    return !prayerTimes.some((prayer) =>
-      hasOverlap(aiBlock, prayer, bufferMinutes)
-    );
-  });
+  const safeBlocks: TimeBlock[] = [];
+
+  for (const aiBlock of aiBlocks) {
+    let currentBlock = { ...aiBlock };
+    let dropBlock = false;
+
+    for (const prayer of prayerTimes) {
+      if (hasOverlap(currentBlock, prayer, bufferMinutes)) {
+        const pStart = parseTime(prayer.startTime) - bufferMinutes;
+        const pEnd = parseTime(prayer.endTime) + bufferMinutes;
+        const bStart = parseTime(currentBlock.startTime);
+        const bEnd = parseTime(currentBlock.endTime);
+
+        // If the block is entirely swallowed by the prayer buffer, drop it
+        if (bStart >= pStart && bEnd <= pEnd) {
+          dropBlock = true;
+          console.warn(`Dropped block "${currentBlock.label}" due to full overlap with ${prayer.label}`);
+          break;
+        }
+
+        // If it overlaps the pre-prayer buffer (starts before buffer, ends inside it)
+        if (bStart < pStart && bEnd > pStart && bEnd <= pEnd) {
+          console.warn(`Trimmed end time of "${currentBlock.label}" to avoid overlap with ${prayer.label}`);
+          currentBlock.endTime = minutesToTime(pStart);
+        }
+        // If it overlaps the post-prayer buffer (starts inside it, ends after)
+        else if (bStart >= pStart && bStart < pEnd && bEnd > pEnd) {
+          console.warn(`Trimmed start time of "${currentBlock.label}" to avoid overlap with ${prayer.label}`);
+          currentBlock.startTime = minutesToTime(pEnd);
+        }
+        // If it spans entirely across the prayer buffer (starts before, ends after)
+        // For simplicity based on requirements, we'll just trim the end to the start of the buffer.
+        // A more complex implementation would split the block, but trimming is requested.
+        else if (bStart < pStart && bEnd > pEnd) {
+          console.warn(`Trimmed end time of "${currentBlock.label}" to avoid overlap with ${prayer.label} (spanned across)`);
+          currentBlock.endTime = minutesToTime(pStart);
+        }
+      }
+    }
+
+    if (!dropBlock) {
+      safeBlocks.push(currentBlock);
+    }
+  }
 
   // Combine safe AI blocks with all prayer blocks
   const merged = [...safeBlocks, ...prayerTimes];

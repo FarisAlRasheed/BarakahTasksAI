@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
-import { Moon, Sun, Feather, Sparkles, Loader2, Plus, X, AlertCircle } from "lucide-react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { Moon, Sun, Feather, Sparkles, Loader2, Plus, X, AlertCircle, Send, MessageCircle } from "lucide-react";
 import { SAUDI_CITIES } from "@/lib/cities";
 import { sortBlocks, hasOverlap, type TimeBlock } from "@/lib/schedule";
+import { type ChatTask } from "@/lib/chat";
 import TimelineCard from "./TimelineCard";
 import FocusTimer from "./FocusTimer";
 
@@ -11,7 +12,15 @@ export default function StudyFlow() {
   // ─── State ───────────────────────────────────────────────────────
   const [dark, setDark] = useState(false);
   const [city, setCity] = useState(SAUDI_CITIES[0].nameAr);
-  const [taskText, setTaskText] = useState("");
+  
+  // Chat State
+  const [messageInput, setMessageInput] = useState("");
+  const [messages, setMessages] = useState<{role: "user" | "ai", text: string}[]>([]);
+  const [draftTasks, setDraftTasks] = useState<ChatTask[]>([]);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [isChatCollapsed, setIsChatCollapsed] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
   const [scheduleItems, setScheduleItems] = useState<TimeBlock[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,20 +93,21 @@ export default function StudyFlow() {
 
   // ─── Generate Schedule ───────────────────────────────────────────
   const handleOrganize = useCallback(async () => {
-    if (!taskText.trim()) {
-      setError("اكتب مهامك أولاً");
+    if (draftTasks.length === 0) {
+      setError("لا يوجد مهام لترتيبها، اكتب مهامك في المحادثة أولاً");
       return;
     }
 
     setLoading(true);
     setError(null);
     setScheduleItems([]);
+    setIsChatCollapsed(true);
 
     try {
       const response = await fetch("/api/schedule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ city, taskText }),
+        body: JSON.stringify({ city, tasks: draftTasks }),
       });
 
       const data = await response.json();
@@ -108,13 +118,56 @@ export default function StudyFlow() {
 
       setScheduleItems(data.timeline);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "حدث خطأ غير متوقع"
-      );
+      setError(err instanceof Error ? err.message : "حدث خطأ غير متوقع");
+      setIsChatCollapsed(false);
     } finally {
       setLoading(false);
     }
-  }, [city, taskText]);
+  }, [city, draftTasks]);
+
+  // ─── Chat Message Handler ────────────────────────────────────────
+  const handleSendMessage = useCallback(async (text = messageInput) => {
+    if (!text.trim()) return;
+    
+    if (text.trim() === "رتّب") {
+      handleOrganize();
+      setMessageInput("");
+      return;
+    }
+
+    const currentMsg = text.trim();
+    setMessageInput("");
+    setError(null);
+    setMessages(prev => [...prev, { role: "user", text: currentMsg }]);
+    setChatLoading(true);
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          message: currentMsg, 
+          prevTasks: draftTasks,
+          history: messages.slice(-6) // Send the last 6 messages for context
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "خطأ في الاتصال");
+
+      setDraftTasks(data.tasks);
+      setMessages(prev => [...prev, { role: "ai", text: data.reply }]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "حدث خطأ");
+      setMessages(prev => prev.slice(0, -1));
+    } finally {
+      setChatLoading(false);
+    }
+  }, [messageInput, draftTasks, handleOrganize]);
+
+  // Scroll chat to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   // ─── Focus Timer ─────────────────────────────────────────────────
   const handleStartTimer = useCallback((label: string) => {
@@ -185,15 +238,7 @@ export default function StudyFlow() {
   }, []);
 
   // ─── Keyboard Shortcut ───────────────────────────────────────────
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        handleOrganize();
-      }
-    },
-    [handleOrganize]
-  );
+  // Handled inside the textarea for chat directly.
 
   return (
     <div
@@ -248,52 +293,112 @@ export default function StudyFlow() {
           </div>
         </div>
 
-        {/* ─── Task Input ─────────────────────────────────────────── */}
-        <div
-          className="rounded-lg border px-3 py-2 sm:px-4 sm:py-3 mb-6 flex items-center gap-2"
-          style={{
-            background: "var(--card)",
-            borderColor: "var(--line)",
-            color: "var(--ink)",
-          }}
-        >
-          <Feather size={16} style={{ color: "var(--ink-soft)", flexShrink: 0 }} />
-          <input
-            id="task-input"
-            type="text"
-            value={taskText}
-            onChange={(e) => {
-              setTaskText(e.target.value);
-              if (error) setError(null);
-            }}
-            onKeyDown={handleKeyDown}
-            placeholder="اكتب مهامك اليوم كما تحدّث صديقاً..."
-            className="flex-1 bg-transparent outline-none text-sm sm:text-base placeholder:opacity-60"
-            style={{ color: "var(--ink)" }}
-            dir="rtl"
-          />
-          <button
-            id="organize-btn"
-            onClick={handleOrganize}
-            disabled={loading}
-            className="shrink-0 text-xs sm:text-sm px-3 py-1.5 sm:px-4 sm:py-2 rounded-md border flex items-center gap-1 hover:opacity-80 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-            style={{
-              background: "var(--paper)",
-              borderColor: "var(--line)",
-              color: "var(--ink)",
-            }}
-          >
-            {loading ? (
-              <>
-                جارٍ الترتيب <Loader2 size={13} className="animate-spin" />
-              </>
-            ) : (
-              <>
-                رتّب <Sparkles size={13} />
-              </>
+        {/* ─── Chat Area ─────────────────────────────────────────── */}
+        {!isChatCollapsed && (
+          <div className="mb-8">
+            {messages.length > 0 && (
+              <div className="max-h-60 sm:max-h-80 overflow-y-auto mb-4 space-y-3 px-2 custom-scrollbar">
+                {messages.map((msg, i) => (
+                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`} dir="rtl">
+                    <div 
+                      className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${msg.role === 'user' ? 'rounded-tr-none' : 'rounded-tl-none'}`}
+                      style={{
+                        background: msg.role === 'user' ? 'var(--gold)' : 'var(--card)',
+                        color: msg.role === 'user' ? 'var(--paper)' : 'var(--ink)',
+                        border: msg.role === 'ai' ? '1px solid var(--line)' : 'none',
+                        whiteSpace: 'pre-wrap'
+                      }}
+                    >
+                      {msg.text}
+                    </div>
+                  </div>
+                ))}
+                {chatLoading && (
+                  <div className="flex justify-end" dir="rtl">
+                    <div className="max-w-[85%] rounded-2xl rounded-tl-none px-4 py-3 text-sm flex items-center gap-2"
+                      style={{ background: 'var(--card)', border: '1px solid var(--line)' }}
+                    >
+                      <Loader2 size={16} className="animate-spin opacity-50" />
+                      <span className="opacity-50">يتم تحديث المهام...</span>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
             )}
-          </button>
-        </div>
+
+            <div
+              className="rounded-lg border px-3 py-2 sm:px-4 sm:py-3 flex items-end gap-2"
+              style={{
+                background: "var(--card)",
+                borderColor: "var(--line)",
+                color: "var(--ink)",
+              }}
+            >
+              <button
+                onClick={() => handleSendMessage()}
+                disabled={chatLoading || !messageInput.trim()}
+                className="shrink-0 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                style={{ color: "var(--gold)" }}
+                aria-label="إرسال"
+              >
+                <Send size={18} className="rtl:-scale-x-100" />
+              </button>
+              
+              <textarea
+                value={messageInput}
+                onChange={(e) => {
+                  setMessageInput(e.target.value);
+                  if (error) setError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                placeholder="اكتب مهامك، عدّلها، أو قل 'رتّب' لإنشاء الجدول..."
+                className="flex-1 bg-transparent outline-none text-sm sm:text-base placeholder:opacity-60 resize-none max-h-32 min-h-[44px] pt-2"
+                style={{ color: "var(--ink)" }}
+                dir="rtl"
+                rows={1}
+              />
+              <Feather size={18} style={{ color: "var(--ink-soft)", flexShrink: 0, marginBottom: '10px' }} />
+            </div>
+            
+            <div className="flex justify-start mt-3">
+              <button
+                id="organize-btn"
+                onClick={handleOrganize}
+                disabled={loading || draftTasks.length === 0}
+                className="text-xs sm:text-sm px-4 py-2 rounded-md border flex items-center gap-1.5 hover:opacity-80 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-sm"
+                style={{
+                  background: "var(--gold)",
+                  borderColor: "var(--gold)",
+                  color: "var(--paper)",
+                }}
+              >
+                {loading ? (
+                  <>جارٍ الترتيب <Loader2 size={14} className="animate-spin" /></>
+                ) : (
+                  <>رتّب الجدول النهائي <Sparkles size={14} /></>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {isChatCollapsed && (
+           <div className="mb-6 flex justify-center">
+             <button
+                onClick={() => setIsChatCollapsed(false)}
+                className="text-xs px-4 py-2 rounded-full border flex items-center gap-2 hover:opacity-80 transition-all cursor-pointer"
+                style={{ background: "var(--card)", borderColor: "var(--line)", color: "var(--ink)" }}
+              >
+                <MessageCircle size={14} /> العودة للمحادثة وتعديل المهام
+             </button>
+           </div>
+        )}
 
         {/* ─── Error Message ──────────────────────────────────────── */}
         {error && (
@@ -383,7 +488,7 @@ export default function StudyFlow() {
         )}
 
         {/* ─── Empty State ────────────────────────────────────────── */}
-        {!loading && scheduleItems.length === 0 && !error && (
+        {!loading && scheduleItems.length === 0 && !error && isChatCollapsed && (
           <div
             className="text-center py-16 text-sm"
             style={{ color: "var(--ink-soft)" }}
@@ -393,23 +498,7 @@ export default function StudyFlow() {
               className="mx-auto mb-3 opacity-30"
               style={{ color: "var(--gold)" }}
             />
-            <p>اكتب مهامك واضغط &quot;رتّب&quot; لإنشاء جدولك</p>
-            <p className="mt-1 text-xs opacity-60">
-              مثال: عندي اختبار رياضيات بكرا وأبي أراجع ١٠٠ صفحة
-            </p>
-            <div className="mt-4">
-              <button
-                onClick={openAddModal}
-                className="text-xs px-4 py-2 rounded-md border inline-flex items-center gap-1.5 hover:opacity-80 transition-all duration-200 hover:scale-105 cursor-pointer"
-                style={{
-                  background: "var(--card)",
-                  borderColor: "var(--line)",
-                  color: "var(--ink)",
-                }}
-              >
-                <Plus size={14} /> أو أضف مهمة يدوياً
-              </button>
-            </div>
+            <p>لا يوجد جدول حالياً. افتح المحادثة لإضافة مهامك.</p>
           </div>
         )}
       </div>

@@ -169,35 +169,44 @@ describe("mergeScheduleWithPrayerTimes", () => {
     },
   ];
 
-  it("no returned study block overlaps a prayer time's 30-minute buffer window", () => {
+  it("trims study blocks that overlap with a prayer time's 30-minute buffer window", () => {
     const aiBlocks: TimeBlock[] = [
       {
         type: "study",
         label: "رياضيات",
-        startTime: "09:00",
-        endTime: "11:00",
+        startTime: "11:00",
+        endTime: "11:45", // Overlaps pre-prayer buffer (starts 11:30)
       },
       {
         type: "study",
         label: "فيزياء",
-        startTime: "11:40", // overlaps Dhuhr buffer (11:30-12:00)
-        endTime: "12:10",
+        startTime: "12:45", // Overlaps post-prayer buffer (ends 13:00)
+        endTime: "14:00",
       },
       {
         type: "study",
         label: "كيمياء",
-        startTime: "14:00",
-        endTime: "16:00",
+        startTime: "11:45", // Entirely inside buffer
+        endTime: "12:15",
       },
     ];
 
     const result = mergeScheduleWithPrayerTimes(aiBlocks, prayerBlocks, 30);
 
-    // The فيزياء block should be removed because it overlaps the buffer
     const studyBlocks = result.filter((b) => b.type === "study");
-    expect(studyBlocks.find((b) => b.label === "فيزياء")).toBeUndefined();
-    expect(studyBlocks.find((b) => b.label === "رياضيات")).toBeDefined();
-    expect(studyBlocks.find((b) => b.label === "كيمياء")).toBeDefined();
+    
+    // رياضيات should be trimmed to end at 11:30
+    const math = studyBlocks.find((b) => b.label === "رياضيات");
+    expect(math).toBeDefined();
+    expect(math?.endTime).toBe("11:30");
+
+    // فيزياء should be trimmed to start at 13:00
+    const physics = studyBlocks.find((b) => b.label === "فيزياء");
+    expect(physics).toBeDefined();
+    expect(physics?.startTime).toBe("13:00");
+    
+    // كيمياء is entirely swallowed by the buffer, so it should be dropped
+    expect(studyBlocks.find((b) => b.label === "كيمياء")).toBeUndefined();
   });
 
   it("study blocks and prayer blocks are sorted by startTime", () => {

@@ -20,11 +20,13 @@ import {
   type TimeBlock,
 } from "@/lib/schedule";
 
+import type { ChatTask } from "@/lib/chat";
+
 // ─── Input Validation ────────────────────────────────────────────────
 
 interface ScheduleRequest {
   city: string;
-  taskText: string;
+  tasks: ChatTask[];
 }
 
 function validateInput(
@@ -34,7 +36,7 @@ function validateInput(
     return { valid: false, error: "Invalid request body" };
   }
 
-  const { city, taskText } = body as Record<string, unknown>;
+  const { city, tasks } = body as Record<string, unknown>;
 
   if (typeof city !== "string" || !city.trim()) {
     return { valid: false, error: "المدينة مطلوبة" };
@@ -44,20 +46,13 @@ function validateInput(
     return { valid: false, error: "المدينة غير مدعومة" };
   }
 
-  if (typeof taskText !== "string" || !taskText.trim()) {
-    return { valid: false, error: "يرجى كتابة مهامك" };
-  }
-
-  if (taskText.length > 2000) {
-    return {
-      valid: false,
-      error: "النص طويل جداً (الحد الأقصى ٢٠٠٠ حرف)",
-    };
+  if (!Array.isArray(tasks) || tasks.length === 0) {
+    return { valid: false, error: "يرجى تقديم المهام المراد جدولتها" };
   }
 
   return {
     valid: true,
-    data: { city: city.trim(), taskText: taskText.trim() },
+    data: { city: city.trim(), tasks: tasks as ChatTask[] },
   };
 }
 
@@ -87,10 +82,18 @@ async function fetchPrayerTimes(
   return data.data.timings;
 }
 
+// ─── Task-count sanity check ──────────────────────────────────────────
+// Used to detect obvious drops/hallucinations from the AI response — not a
+// hard requirement, just a warning signal in the logs.
+
+function estimateTaskCount(tasks: ChatTask[]): number {
+  return Math.max(tasks.length, 1);
+}
+
 // ─── Groq AI Schedule Generation ─────────────────────────────────────
 
 async function generateAISchedule(
-  taskText: string,
+  tasks: ChatTask[],
   prayerBlocks: TimeBlock[]
 ): Promise<TimeBlock[]> {
   const apiKey = process.env.GROQ_API_KEY;
@@ -103,35 +106,58 @@ async function generateAISchedule(
     .map((p) => `${p.label}: ${p.startTime} - ${p.endTime}`)
     .join("\n");
 
-  const prompt = `أنت مساعد ذكي لتنظيم جدول دراسة الطالب. الطالب كتب مهامه بالعربي وأنت تحتاج ترتبها حول أوقات الصلاة.
+  const prompt = `أنت محرك جدولة دقيق، ولست مساعداً محادثاً. مهمتك الوحيدة هي أخذ المهام المسجلة
+ووضعها في جدول زمني (JSON)، بدقة تامة وبدون أي إبداع أو إضافات.
 
-مهام الطالب:
-${taskText}
+═══════════════════════════════════
+القاعدة الأهم: الدقة في الجدولة
+═══════════════════════════════════
+- قم بجدولة المهام المسجلة أدناه فقط. لا تخترع أي مهام أخرى.
+- يجب أن يتم جدولة كل مهمة مرسلة إليك دون استثناء.
+- عدد عناصر "study" و "sleep" في الناتج يجب أن يساوي بالضبط عدد المهام المرسلة إليك.
+- لا تضف مهام "راحة" أو "وجبة" من عندك كعناصر مستقلة.
+
+═══════════════════════════════════
+معالجة المهام ذات الوقت الثابت
+═══════════════════════════════════
+إذا كانت المهمة تحتوي على وقت ثابت أو ذكر الطالب لها وقتاً محدداً:
+- التزم بكامل تلك المدة الزمنية، دون تقصير أو تحريك.
+- إذا وقع وقت أذان داخل تلك المدة، قسّم المهمة إلى جزأين حول فاصل الصلاة
+  بدل حذفها أو تحريكها (بدون حذف وقت الصلاة نفسه من الجدول).
+
+═══════════════════════════════════
+معالجة المهام بدون وقت محدد
+═══════════════════════════════════
+1. رتّبها حسب الإلحاح (مفتاح urgency): المهام الأكثر إلحاحاً تُوضع أولاً بوقت أطول نسبياً (60-120 دقيقة).
+2. المهام الأقل إلحاحاً تُوضع لاحقاً بمدة أقصر (25-60 دقيقة).
+3. إذا لم يتسع اليوم لكل المهام، أعطِ الأولوية للمهام الملحة، وضع الباقي
+   في آخر الجدول.
+
+═══════════════════════════════════
+قواعد عامة
+═══════════════════════════════════
+1. اترك فاصل 30 دقيقة بعد كل أذان قبل بدء أي مهمة جديدة، إلا في حالة المهام
+   ذات الوقت الثابت الموضحة أعلاه.
+2. استخدم تنسيق 24 ساعة دائماً (مثال الصيغة فقط: "14:30").
 
 أوقات الصلاة اليوم:
 ${prayerInfo}
 
-القواعد:
-1. رتّب المهام في فترات بين أوقات الصلاة
-2. اترك فاصل 30 دقيقة بعد كل وقت أذان
-3. كل فترة دراسة يجب أن تكون بين 25-120 دقيقة
-4. اقترح وقت نوم مناسب في نهاية اليوم
-5. استخدم تنسيق 24 ساعة للوقت (مثال: "14:30")
+قائمة المهام المطلوب جدولتها:
+${JSON.stringify(tasks)}
 
-أعد النتيجة كـ JSON array فقط بدون أي نص إضافي. كل عنصر يحتوي:
+═══════════════════════════════════
+تنسيق الإخراج
+═══════════════════════════════════
+أعد النتيجة كـ JSON array فقط، بدون أي نص أو شرح أو أسوار كود قبل أو بعد.
+كل عنصر:
 - "type": "study" أو "sleep"
-- "label": اسم المهمة بالعربي
-- "startTime": وقت البداية بتنسيق "HH:mm"
-- "endTime": وقت النهاية بتنسيق "HH:mm"
-- "sub": وصف مختصر بالعربي
+- "label": اسم المهمة (استخدم نفس "label" من المصفوفة المرسلة)
+- "startTime": "HH:mm"
+- "endTime": "HH:mm"
+- "sub": سبب مختصر للترتيب (مثل: "أولوية — موعد غداً")
 
-مثال للنتيجة:
-[
-  {"type":"study","label":"مراجعة الرياضيات","startTime":"08:00","endTime":"09:30","sub":"قبل صلاة الظهر"},
-  {"type":"sleep","label":"موعد النوم","startTime":"22:00","endTime":"06:00","sub":"للاستيقاظ باكراً"}
-]
-
-أعد JSON array فقط:`;
+تذكير أخير قبل الإجابة: يجب جدولة جميع المهام المرسلة أعلاه تماماً. أعد JSON array فقط الآن:`;
 
   const response = await fetch(
     "https://api.groq.com/openai/v1/chat/completions",
@@ -142,15 +168,15 @@ ${prayerInfo}
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
+        model: "llama-3.3-70b-versatile",
         messages: [
           {
             role: "user",
             content: prompt,
           },
         ],
-        temperature: 0.7,
-        max_tokens: 1024,
+        temperature: 0.15,
+        max_tokens: 2048,
       }),
     }
   );
@@ -181,7 +207,7 @@ ${prayerInfo}
     const blocks: TimeBlock[] = JSON.parse(jsonStr);
 
     // Validate the structure
-    return blocks.filter(
+    const validBlocks = blocks.filter(
       (b) =>
         (b.type === "study" || b.type === "sleep") &&
         typeof b.label === "string" &&
@@ -190,6 +216,20 @@ ${prayerInfo}
         /^\d{2}:\d{2}$/.test(b.startTime) &&
         /^\d{2}:\d{2}$/.test(b.endTime)
     );
+
+    // Sanity check: compare estimated task count to what came back.
+    // This doesn't block the response, but logs a warning so silent
+    // drops/hallucinations are visible during testing instead of hidden.
+    const estimatedCount = estimateTaskCount(tasks);
+    const studyCount = validBlocks.filter((b) => b.type === "study" || b.type === "sleep").length;
+    if (Math.abs(estimatedCount - studyCount) > 0) {
+      console.warn(
+        `Task count mismatch: estimated ${estimatedCount} tasks in input, ` +
+        `got ${studyCount} study/sleep blocks back from AI. Input tasks:`, tasks
+      );
+    }
+
+    return validBlocks;
   } catch {
     console.error("Failed to parse AI response:", jsonStr);
     throw new Error("فشل في تحليل استجابة الذكاء الاصطناعي");
@@ -208,7 +248,7 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: validation.error }, { status: 400 });
     }
 
-    const { city, taskText } = validation.data;
+    const { city, tasks } = validation.data;
     const cityObj = findCity(city)!;
 
     // 2. Fetch prayer times from Aladhan
@@ -216,7 +256,7 @@ export async function POST(request: NextRequest) {
     const prayerBlocks = prayerTimesToBlocks(timings);
 
     // 3. Generate AI study schedule
-    const aiBlocks = await generateAISchedule(taskText, prayerBlocks);
+    const aiBlocks = await generateAISchedule(tasks, prayerBlocks);
 
     // 4. Merge AI blocks with prayer blocks (30-min buffer)
     const timeline = mergeScheduleWithPrayerTimes(aiBlocks, prayerBlocks, 30);
