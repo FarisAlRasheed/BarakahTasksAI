@@ -750,7 +750,7 @@ export default function StudyFlow() {
                 {isBarakahOpen && (
                   <div
                     className="absolute left-0 top-full mt-2 w-64 rounded-lg border shadow-lg overflow-hidden animate-fade-in-up"
-                    style={{ background: "var(--card)", borderColor: "var(--line)", zIndex: 100 }}
+                    style={{ background: "var(--card)", borderColor: "var(--line)", zIndex: 1000 }}
                     dir="rtl"
                   >
                     <div
