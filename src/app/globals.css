@@ -1,37 +1,39 @@
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 /* ─── Parchment / Manuscript Color System ─────────────────────────── */
 
 :root {
-  --paper: #F3E9D2;
-  --card: #EBDFC0;
-  --ink: #3B2A1A;
-  --ink-soft: #6B5842;
-  --gold: #8C6A3F;
-  --line: #C9B98E;
-  --accent-glow: rgba(140, 106, 63, 0.15);
+  --paper: #F7F4EB;
+  --card: #EFEBE0;
+  --ink: #4A4036;
+  --ink-soft: #7D7266;
+  --gold: #BBAA88;
+  --line: #DCD5C6;
+  --accent-glow: rgba(187, 170, 136, 0.15);
 
   /* Task Colors */
-  --color-sage: #8F9779;
-  --color-terracotta: #A65D47;
-  --color-dustyblue: #7A8B99;
-  --color-prayer: #4A7C59;
+  --color-sage: #A9B19C;
+  --color-terracotta: #C68A7A;
+  --color-dustyblue: #9BAAB5;
+  --color-prayer: #82A692;
 }
 
 .dark {
-  --paper: #2A2118;
-  --card: #352A1E;
-  --ink: #EAD9B5;
-  --ink-soft: #B8A582;
-  --gold: #C9A15C;
-  --line: #4A3B29;
-  --accent-glow: rgba(201, 161, 92, 0.1);
+  --paper: #242220;
+  --card: #2C2927;
+  --ink: #E0DCD6;
+  --ink-soft: #A19D96;
+  --gold: #B09D7D;
+  --line: #423E3A;
+  --accent-glow: rgba(176, 157, 125, 0.1);
 
   /* Task Colors (Dark) */
-  --color-sage: #7A8264;
-  --color-terracotta: #8B4A36;
-  --color-dustyblue: #617382;
-  --color-prayer: #3B6648;
+  --color-sage: #768065;
+  --color-terracotta: #966153;
+  --color-dustyblue: #6B7C8C;
+  --color-prayer: #577864;
 }
 
 /* ─── Tailwind v4 Theme Integration ───────────────────────────────── */
@@ -59,10 +61,13 @@ html {
 }
 
 body {
-  background: var(--paper);
+  background-color: var(--paper);
+  background-image: radial-gradient(var(--gold) 0.6px, transparent 0.6px);
+  background-size: 20px 20px;
   color: var(--ink);
-  font-family: var(--font-amiri), "Amiri", serif;
-  transition: background-color 0.4s ease-in-out, color 0.4s ease-in-out;
+  font-family: 'Amiri', serif;
+  overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* ─── Smooth Color Transitions ────────────────────────────────────── */
@@ -131,6 +136,17 @@ body {
   50% { transform: translateY(-8px); }
 }
 
+@keyframes slowSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes cloudsMove {
+  0% { transform: translateX(-5%); }
+  50% { transform: translateX(5%); }
+  100% { transform: translateX(-5%); }
+}
+
 .animate-fade-in-up {
   animation: fadeInUp 0.4s ease-out forwards;
 }
@@ -150,6 +166,94 @@ body {
 
 .animate-float {
   animation: float 4s ease-in-out infinite;
+}
+
+.animate-slowSpin {
+  animation: slowSpin 60s linear infinite;
+  transform-origin: center center;
+}
+
+.animate-clouds {
+  animation: cloudsMove 40s ease-in-out infinite;
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.2; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+@keyframes sunGlow {
+  0%, 100% { box-shadow: 0 0 30px 10px rgba(187, 170, 136, 0.15); }
+  50% { box-shadow: 0 0 50px 20px rgba(187, 170, 136, 0.25); }
+}
+
+@keyframes driftUp {
+  0% { transform: translateY(0) scale(1); opacity: 0.3; }
+  100% { transform: translateY(-60px) scale(0.5); opacity: 0; }
+}
+
+@keyframes shootingStar {
+  0% {
+    transform: translateX(0) translateY(0) rotate(-35deg);
+    opacity: 0;
+    width: 0px;
+  }
+  10% {
+    opacity: 1;
+    width: 140px;
+  }
+  40% {
+    transform: translateX(-500px) translateY(320px) rotate(-35deg);
+    opacity: 1;
+    width: 180px;
+  }
+  50%, 100% {
+    transform: translateX(-700px) translateY(450px) rotate(-35deg);
+    opacity: 0;
+    width: 0px;
+  }
+}
+
+@keyframes flyAcross {
+  0% { transform: translateX(-120px) translateY(0); }
+  50% { transform: translateX(50vw) translateY(-25px); }
+  100% { transform: translateX(105vw) translateY(10px); }
+}
+
+@keyframes breezeWave {
+  0% { transform: translateX(-30px); opacity: 0.1; }
+  50% { opacity: 0.4; }
+  100% { transform: translateX(60px); opacity: 0; }
+}
+
+@keyframes beaconPulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.4); }
+}
+
+.animate-twinkle {
+  animation: twinkle 3s ease-in-out infinite;
+}
+
+.animate-sunGlow {
+  animation: sunGlow 4s ease-in-out infinite;
+  border-radius: 50%;
+}
+
+.animate-shootingStar {
+  animation: shootingStar 4s cubic-bezier(0.1, 0.5, 0.5, 1) infinite;
+}
+
+.animate-fly {
+  animation: flyAcross 15s linear infinite;
+}
+
+.animate-breeze {
+  animation: breezeWave 12s ease-in-out infinite;
+}
+
+.animate-beacon {
+  animation: beaconPulse 3s ease-in-out infinite;
 }
 
 /* Smooth Strikethrough for completed tasks */

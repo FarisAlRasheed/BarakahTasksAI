@@ -79,15 +79,16 @@ export default function FocusTimer({ label, onClose }: FocusTimerProps) {
 
   return (
     <div
-      className="timer-overlay fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+      className="timer-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)" }}
     >
       <div
-        className="timer-modal relative rounded-2xl p-6 sm:p-8 w-full max-w-sm mx-4"
+        className="timer-modal relative rounded-3xl p-6 sm:p-8 w-full max-w-sm shadow-2xl transition-all duration-300"
         style={{
           background: "var(--card)",
           border: "1px solid var(--line)",
           color: "var(--ink)",
+          boxShadow: "0 20px 50px -12px rgba(187, 170, 136, 0.25), 0 0 30px rgba(0,0,0,0.2)",
         }}
       >
         {/* Close button */}
