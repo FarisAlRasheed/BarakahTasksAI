@@ -801,7 +801,11 @@ export default function StudyFlow() {
               {scheduleItems
                 .filter((item) => filterType === "all" || item.type === filterType)
                 .map((item, i) => (
-                  <div key={`${item.startTime}-${item.label}-${i}`} className="flex items-stretch mb-0">
+                  <div 
+                    key={`${item.startTime}-${item.label}-${i}`} 
+                    className="flex items-stretch mb-0 relative"
+                    style={{ zIndex: 100 - i }}
+                  >
                     {/* Right time column */}
                     <div className="w-10 flex flex-col items-center flex-shrink-0 relative">
                       {/* Time dot on the line */}

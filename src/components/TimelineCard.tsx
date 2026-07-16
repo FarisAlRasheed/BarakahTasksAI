@@ -59,13 +59,17 @@ export default function TimelineCard({
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
+    function handleClickOutside(event: MouseEvent | TouchEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsMenuOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
   }, []);
 
   // Determine colors
@@ -95,12 +99,13 @@ export default function TimelineCard({
 
   return (
     <div
-      className="group flex items-center gap-2 sm:gap-4 px-2.5 sm:px-5 py-2.5 sm:py-3 mb-2.5 sm:mb-3 rounded-xl sm:rounded-2xl border relative overflow-visible transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:border-[var(--gold)]/40 timeline-item backdrop-blur-sm"
+      className="group flex items-center gap-2 sm:gap-4 px-2.5 sm:px-5 py-2.5 sm:py-3 mb-2.5 sm:mb-3 rounded-xl sm:rounded-2xl border relative overflow-visible transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:border-[var(--gold)]/40 timeline-item"
       style={{
         background: cardBg,
         borderColor: borderColor,
         color: cardColor,
         minHeight: `${minHeight}px`,
+        zIndex: isMenuOpen ? 50 : 1,
       }}
       dir="rtl"
     >
@@ -177,8 +182,8 @@ export default function TimelineCard({
 
             {isMenuOpen && (
               <div
-                className="absolute left-0 top-full mt-1 w-28 rounded-lg border shadow-lg flex flex-col overflow-hidden animate-fade-in-up"
-                style={{ background: "var(--card)", borderColor: "var(--line)", zIndex: 100 }}
+                className="absolute right-0 sm:left-0 top-full mt-1 w-28 rounded-xl border shadow-2xl flex flex-col overflow-hidden animate-fade-in-up"
+                style={{ background: "var(--card)", borderColor: "var(--line)", zIndex: 999 }}
               >
                 {onEdit && (
                   <button
