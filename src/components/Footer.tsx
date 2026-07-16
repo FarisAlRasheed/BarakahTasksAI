@@ -73,9 +73,9 @@ export default function Footer() {
           <div className="flex flex-col items-center gap-2">
             <span className="text-sm font-bold" style={{ color: "var(--gold)" }}>نواف بن فيصل الضفيان</span>
             <div className="flex items-center gap-3">
-              <a 
-                href="#" 
-                target="_blank" 
+              <a
+                href="https://github.com/SKYPRG"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="hover:opacity-80 hover:-translate-y-1 transition-all duration-200"
                 style={{ color: "var(--ink-soft)" }}
