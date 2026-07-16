@@ -38,11 +38,15 @@
 
 /* ─── Base Styles ─────────────────────────────────────────────────── */
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-amiri), "Amiri", serif;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition: background-color 0.4s ease-in-out, color 0.4s ease-in-out;
 }
 
 /* ─── Smooth Color Transitions ────────────────────────────────────── */
@@ -101,6 +105,16 @@ body {
   50% { box-shadow: 0 0 0 8px transparent; }
 }
 
+@keyframes sway {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(1.5deg); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
 .animate-fade-in-up {
   animation: fadeInUp 0.4s ease-out forwards;
 }
@@ -111,6 +125,15 @@ body {
 
 .animate-pulse-gold {
   animation: pulse-gold 2s ease-in-out infinite;
+}
+
+.animate-sway {
+  animation: sway 6s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
 }
 
 /* Staggered animation delays for timeline items */
