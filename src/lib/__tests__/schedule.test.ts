@@ -12,6 +12,7 @@ import {
   hasOverlap,
   prayerTimesToBlocks,
   mergeScheduleWithPrayerTimes,
+  sortBlocks,
   type TimeBlock,
 } from "../schedule";
 
@@ -278,3 +279,20 @@ describe("mergeScheduleWithPrayerTimes", () => {
     expect(sleepBlocks).toHaveLength(1); // No overlap with prayers
   });
 });
+
+// ─── sortBlocks ──────────────────────────────────────────────────────
+
+describe("sortBlocks", () => {
+  it("sorts an array of TimeBlocks chronologically by their startTime", () => {
+    const blocks: TimeBlock[] = [
+      { type: "study", label: "كيمياء", startTime: "14:00", endTime: "15:00" },
+      { type: "prayer", label: "أذان الظهر", startTime: "12:00", endTime: "12:30" },
+      { type: "study", label: "رياضيات", startTime: "08:00", endTime: "09:00" },
+    ];
+    const sorted = sortBlocks(blocks);
+    expect(sorted[0].label).toBe("رياضيات");
+    expect(sorted[1].label).toBe("أذان الظهر");
+    expect(sorted[2].label).toBe("كيمياء");
+  });
+});
+
