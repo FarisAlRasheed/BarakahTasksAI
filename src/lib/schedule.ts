@@ -16,6 +16,7 @@ export interface TimeBlock {
   startTime: string; // "HH:mm" 24-hour format
   endTime: string; // "HH:mm" 24-hour format
   sub?: string;
+  completed?: boolean;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -153,4 +154,11 @@ export function mergeScheduleWithPrayerTimes(
   merged.sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime));
 
   return merged;
+}
+
+/**
+ * Sorts an array of TimeBlocks chronologically by their startTime.
+ */
+export function sortBlocks(blocks: TimeBlock[]): TimeBlock[] {
+  return [...blocks].sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime));
 }
