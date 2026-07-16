@@ -1,6 +1,5 @@
-"use client";
-
-import { Moon, BookOpen, Bed, Timer, Check, Pencil, Trash2 } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Moon, BookOpen, Bed, Timer, Check, Pencil, Trash2, MoreVertical } from "lucide-react";
 import type { TimeBlock } from "@/lib/schedule";
 
 interface TimelineCardProps {
@@ -46,10 +45,24 @@ export default function TimelineCard({
   const isPrayer = item.type === "prayer";
   const isStudy = item.type === "study";
 
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   return (
-    <div className={`transition-opacity duration-300 ${item.completed ? "opacity-50" : ""}`}>
+    <div className={`transition-all duration-300 relative hover:-translate-y-[2px] hover:shadow-sm ${item.completed ? "opacity-50" : ""} ${isMenuOpen ? "z-50" : "z-10"}`}>
       <div
-        className="timeline-item animate-fade-in-up opacity-0 rounded-lg border px-3 sm:px-4 py-3 mb-2 flex items-center gap-3 group"
+        className="timeline-item animate-fade-in-up opacity-0 rounded-lg border px-3 sm:px-4 py-3 mb-2 flex items-center gap-3 group transition-all duration-300"
+
         style={{
           background: "var(--card)",
           borderColor: "var(--line)",
@@ -106,55 +119,87 @@ export default function TimelineCard({
 
         {/* Action buttons (only for study/sleep blocks) */}
         {!isPrayer && (
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            {onEdit && (
-              <button
-                onClick={() => onEdit(index)}
-                className="p-1.5 rounded-md border hover:scale-105 transition-all cursor-pointer"
-                style={{
-                  background: "var(--paper)",
-                  borderColor: "var(--line)",
-                  color: "var(--ink-soft)",
-                }}
-                aria-label="تعديل المهمة"
-                title="تعديل المهمة"
-              >
-                <Pencil size={13} />
-              </button>
-            )}
+          <>
+            {/* Desktop: show on hover */}
+            <div className="hidden sm:flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              {onEdit && (
+                <button
+                  onClick={() => onEdit(index)}
+                  className="p-1.5 rounded-md border hover:scale-105 transition-all cursor-pointer"
+                  style={{ background: "var(--paper)", borderColor: "var(--line)", color: "var(--ink-soft)" }}
+                  title="تعديل المهمة"
+                >
+                  <Pencil size={13} />
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  onClick={() => onDelete(index)}
+                  className="p-1.5 rounded-md border hover:scale-105 hover:text-red-500 transition-all cursor-pointer"
+                  style={{ background: "var(--paper)", borderColor: "var(--line)", color: "var(--ink-soft)" }}
+                  title="حذف المهمة"
+                >
+                  <Trash2 size={13} />
+                </button>
+              )}
+              {isStudy && onStartTimer && (
+                <button
+                  onClick={() => onStartTimer(item.label)}
+                  className="p-1.5 rounded-md border hover:scale-105 transition-all cursor-pointer"
+                  style={{ background: "var(--paper)", borderColor: "var(--line)", color: "var(--gold)" }}
+                  title="ابدأ مؤقت التركيز"
+                >
+                  <Timer size={13} />
+                </button>
+              )}
+            </div>
 
-            {onDelete && (
+            {/* Mobile: 3 dots menu */}
+            <div className="sm:hidden relative flex items-center" ref={menuRef}>
               <button
-                onClick={() => onDelete(index)}
-                className="p-1.5 rounded-md border hover:scale-105 hover:text-red-500 transition-all cursor-pointer"
-                style={{
-                  background: "var(--paper)",
-                  borderColor: "var(--line)",
-                  color: "var(--ink-soft)",
-                }}
-                aria-label="حذف المهمة"
-                title="حذف المهمة"
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                style={{ color: "var(--ink-soft)" }}
+                aria-label="خيارات المهمة"
               >
-                <Trash2 size={13} />
+                <MoreVertical size={18} />
               </button>
-            )}
 
-            {isStudy && onStartTimer && (
-              <button
-                onClick={() => onStartTimer(item.label)}
-                className="p-1.5 rounded-md border hover:scale-105 transition-all cursor-pointer"
-                style={{
-                  background: "var(--paper)",
-                  borderColor: "var(--line)",
-                  color: "var(--gold)",
-                }}
-                aria-label={`بدء مؤقت ${item.label}`}
-                title="ابدأ مؤقت التركيز"
-              >
-                <Timer size={13} />
-              </button>
-            )}
-          </div>
+              {isMenuOpen && (
+                <div 
+                  className="absolute left-0 top-full mt-2 w-32 rounded-lg border shadow-lg flex flex-col overflow-hidden animate-fade-in-up"
+                  style={{ background: "var(--card)", borderColor: "var(--line)", zIndex: 100 }}
+                >
+                  {isStudy && onStartTimer && (
+                    <button
+                      onClick={() => { onStartTimer(item.label); setIsMenuOpen(false); }}
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-right hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                      style={{ color: "var(--gold)" }}
+                    >
+                      <Timer size={14} /> بدء المؤقت
+                    </button>
+                  )}
+                  {onEdit && (
+                    <button
+                      onClick={() => { onEdit(index); setIsMenuOpen(false); }}
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-right hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                      style={{ color: "var(--ink)" }}
+                    >
+                      <Pencil size={14} /> تعديل
+                    </button>
+                  )}
+                  {onDelete && (
+                    <button
+                      onClick={() => { onDelete(index); setIsMenuOpen(false); }}
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-right text-red-500 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    >
+                      <Trash2 size={14} /> حذف
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </>
         )}
 
         {/* Time display */}
