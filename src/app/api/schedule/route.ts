@@ -142,7 +142,7 @@ ${prayerInfo}
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
+        model: "openai/gpt-oss-20b",
         messages: [
           {
             role: "user",
@@ -150,7 +150,8 @@ ${prayerInfo}
           },
         ],
         temperature: 0.7,
-        max_tokens: 1024,
+        max_tokens: 2048,
+        reasoning_effort: "low",
       }),
     }
   );

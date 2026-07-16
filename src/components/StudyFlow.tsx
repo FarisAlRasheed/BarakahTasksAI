@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Moon, Sun, Feather, Sparkles, Loader2 } from "lucide-react";
+import { Moon, Sun, Feather, Sparkles, Loader2, Plus, Check, X } from "lucide-react";
 import { SAUDI_CITIES } from "@/lib/cities";
 import type { TimeBlock } from "@/lib/schedule";
 import TimelineCard from "./TimelineCard";
@@ -16,6 +16,10 @@ export default function StudyFlow() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [timerLabel, setTimerLabel] = useState<string | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newTaskLabel, setNewTaskLabel] = useState("");
+  const [newTaskTime, setNewTaskTime] = useState("");
+  const [addError, setAddError] = useState<string | null>(null);
 
   // ─── Dark Mode Toggle ────────────────────────────────────────────
   const toggleDark = useCallback(() => {
@@ -63,6 +67,84 @@ export default function StudyFlow() {
       setLoading(false);
     }
   }, [city, taskText]);
+
+  // ─── Delete Schedule Item ────────────────────────────────────────
+  const handleDeleteItem = useCallback((index: number) => {
+    setScheduleItems((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  // ─── Edit Schedule Item ──────────────────────────────────────────
+  const handleEditItem = useCallback(
+    (index: number, updated: Partial<TimeBlock>) => {
+      setScheduleItems((prev) => {
+        const next = prev.map((item, i) =>
+          i === index ? { ...item, ...updated } : item
+        );
+        // Re-sort by start time so an edited time lands in the right place
+        next.sort(
+          (a, b) =>
+            Number(a.startTime.replace(":", "")) -
+            Number(b.startTime.replace(":", ""))
+        );
+        return next;
+      });
+    },
+    []
+  );
+
+  // ─── Add Task Manually ───────────────────────────────────────────
+  const openAddForm = useCallback(() => {
+    setNewTaskLabel("");
+    setNewTaskTime("");
+    setAddError(null);
+    setShowAddForm(true);
+  }, []);
+
+  const cancelAddForm = useCallback(() => {
+    setShowAddForm(false);
+    setAddError(null);
+  }, []);
+
+  const handleAddTask = useCallback(() => {
+    const label = newTaskLabel.trim();
+    if (!label) {
+      setAddError("اكتب اسم المهمة");
+      return;
+    }
+    if (!/^\d{2}:\d{2}$/.test(newTaskTime)) {
+      setAddError("اختر وقتاً للمهمة");
+      return;
+    }
+
+    // End time defaults to 30 minutes after the start (not displayed, kept sane)
+    const [h, m] = newTaskTime.split(":").map(Number);
+    const endMinutes = h * 60 + m + 30;
+    const endTime = `${String(Math.floor(endMinutes / 60) % 24).padStart(
+      2,
+      "0"
+    )}:${String(endMinutes % 60).padStart(2, "0")}`;
+
+    const newBlock: TimeBlock = {
+      type: "study",
+      label,
+      startTime: newTaskTime,
+      endTime,
+      sub: "مهمة مضافة",
+    };
+
+    setScheduleItems((prev) => {
+      const next = [...prev, newBlock];
+      next.sort(
+        (a, b) =>
+          Number(a.startTime.replace(":", "")) -
+          Number(b.startTime.replace(":", ""))
+      );
+      return next;
+    });
+
+    setShowAddForm(false);
+    setAddError(null);
+  }, [newTaskLabel, newTaskTime]);
 
   // ─── Focus Timer ─────────────────────────────────────────────────
   const handleStartTimer = useCallback((label: string) => {
@@ -194,9 +276,106 @@ export default function StudyFlow() {
         )}
 
         {/* ─── Timeline Header ────────────────────────────────────── */}
-        <div className="text-sm mb-2" style={{ color: "var(--ink-soft)" }}>
-          الجدول الزمني — اليوم
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm" style={{ color: "var(--ink-soft)" }}>
+            الجدول الزمني — اليوم
+          </span>
+          {!loading && scheduleItems.length > 0 && !showAddForm && (
+            <button
+              onClick={openAddForm}
+              className="text-xs px-3 py-1.5 rounded-md border flex items-center gap-1 hover:opacity-80 transition-all duration-200 hover:scale-105"
+              style={{
+                background: "var(--card)",
+                borderColor: "var(--line)",
+                color: "var(--ink)",
+              }}
+            >
+              <Plus size={13} /> إضافة مهمة
+            </button>
+          )}
         </div>
+
+        {/* ─── Add Task Form ──────────────────────────────────────── */}
+        {showAddForm && (
+          <div
+            className="animate-fade-in-up rounded-lg border px-3 sm:px-4 py-3 mb-2"
+            style={{
+              background: "var(--card)",
+              borderColor: "var(--gold)",
+              color: "var(--ink)",
+            }}
+          >
+            <div className="flex flex-col gap-2">
+              {/* Task name */}
+              <input
+                type="text"
+                value={newTaskLabel}
+                onChange={(e) => {
+                  setNewTaskLabel(e.target.value);
+                  if (addError) setAddError(null);
+                }}
+                placeholder="اسم المهمة"
+                dir="rtl"
+                className="w-full bg-transparent outline-none border rounded-md px-2 py-1.5 text-sm font-bold"
+                style={{ borderColor: "var(--line)", color: "var(--ink)" }}
+              />
+
+              {/* Time */}
+              <div className="flex flex-col gap-0.5">
+                <label className="text-xs" style={{ color: "var(--ink-soft)" }}>
+                  الوقت
+                </label>
+                <input
+                  type="time"
+                  value={newTaskTime}
+                  onChange={(e) => {
+                    setNewTaskTime(e.target.value);
+                    if (addError) setAddError(null);
+                  }}
+                  className="w-full bg-transparent outline-none border rounded-md px-2 py-1 text-sm"
+                  style={{ borderColor: "var(--line)", color: "var(--ink)" }}
+                />
+              </div>
+
+              {/* Error */}
+              {addError && (
+                <div className="text-xs text-red-600 dark:text-red-400">
+                  {addError}
+                </div>
+              )}
+
+              {/* Add / Cancel */}
+              <div className="flex items-center gap-2 justify-end">
+                <button
+                  onClick={cancelAddForm}
+                  className="p-1.5 rounded-md border transition-all duration-200 hover:scale-105"
+                  style={{
+                    background: "var(--paper)",
+                    borderColor: "var(--line)",
+                    color: "var(--ink-soft)",
+                  }}
+                  aria-label="إلغاء"
+                  title="إلغاء"
+                >
+                  <X size={14} />
+                </button>
+                <button
+                  onClick={handleAddTask}
+                  className="p-1.5 rounded-md border transition-all duration-200 hover:scale-105"
+                  style={{
+                    background: "var(--paper)",
+                    borderColor: "var(--line)",
+                    color: "var(--gold)",
+                  }}
+                  aria-label="إضافة"
+                  title="إضافة"
+                >
+                  <Check size={14} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ─── Loading Skeleton ────────────────────────────────────── */}
         {loading && (
@@ -233,6 +412,8 @@ export default function StudyFlow() {
                 item={item}
                 index={i}
                 onStartTimer={handleStartTimer}
+                onDelete={handleDeleteItem}
+                onEdit={handleEditItem}
               />
             ))}
           </div>
