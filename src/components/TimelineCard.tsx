@@ -86,10 +86,10 @@ export default function TimelineCard({
     borderColor = "var(--color-prayer)";
     isColored = true;
   } else if (item.color && item.color !== "default") {
-    cardBg = `var(--color-task-${item.color})`;
+    cardBg = `var(--color-${item.color})`;
     cardColor = "var(--paper)";
     subColor = "var(--paper)";
-    borderColor = `var(--color-task-${item.color})`;
+    borderColor = `var(--color-${item.color})`;
     isColored = true;
   }
 
