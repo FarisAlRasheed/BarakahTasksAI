@@ -11,12 +11,13 @@
 // ─── Types ───────────────────────────────────────────────────────────
 
 export interface TimeBlock {
-  type: "study" | "prayer" | "sleep";
+  type: "study" | "prayer" | "sleep" | "workout" | "meeting";
   label: string;
   startTime: string; // "HH:mm" 24-hour format
   endTime: string; // "HH:mm" 24-hour format
   sub?: string;
   completed?: boolean;
+  color?: string; // e.g. "sage", "terracotta", "dustyblue", "gold"
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────

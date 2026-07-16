@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Moon, BookOpen, Bed, Timer, Check, Pencil, Trash2, MoreVertical } from "lucide-react";
+import { Moon, BookOpen, Bed, Timer, Check, Pencil, Trash2, MoreVertical, Dumbbell, Coffee } from "lucide-react";
 import type { TimeBlock } from "@/lib/schedule";
 
 interface TimelineCardProps {
@@ -14,6 +14,8 @@ interface TimelineCardProps {
 function iconFor(type: TimeBlock["type"]) {
   if (type === "prayer") return Moon;
   if (type === "sleep") return Bed;
+  if (type === "workout") return Dumbbell;
+  if (type === "meeting") return Coffee;
   return BookOpen;
 }
 
@@ -58,60 +60,77 @@ export default function TimelineCard({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  return (
-    <div className={`transition-all duration-300 relative hover:-translate-y-[2px] hover:shadow-sm ${item.completed ? "opacity-50" : ""} ${isMenuOpen ? "z-50" : "z-10"}`}>
-      <div
-        className="timeline-item animate-fade-in-up opacity-0 rounded-lg border px-3 sm:px-4 py-3 mb-2 flex items-center gap-3 group transition-all duration-300"
+  // Determine colors
+  let cardBg = "var(--card)";
+  let cardColor = "var(--ink)";
+  let subColor = "var(--ink-soft)";
+  let borderColor = "var(--line)";
+  let isColored = false;
 
-        style={{
-          background: "var(--card)",
-          borderColor: "var(--line)",
-          borderStyle: isPrayer ? "dashed" : "solid",
-          color: "var(--ink)",
-          animationDelay: `${index * 0.05}s`,
-          animationFillMode: "forwards",
-        }}
-      >
+  if (isPrayer) {
+    cardBg = "var(--color-prayer)";
+    cardColor = "var(--paper)";
+    subColor = "var(--paper)";
+    borderColor = "var(--color-prayer)";
+    isColored = true;
+  } else if (item.color && item.color !== "default") {
+    cardBg = `var(--color-task-${item.color})`;
+    cardColor = "var(--paper)";
+    subColor = "var(--paper)";
+    borderColor = `var(--color-task-${item.color})`;
+    isColored = true;
+  }
+
+  return (
+    <div
+      className="group flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-4 mb-4 rounded-xl border relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-md timeline-item"
+      style={{
+        background: cardBg,
+        borderColor: borderColor,
+        color: cardColor,
+      }}
+      dir="rtl"
+    >
         {/* Checkbox (for study/sleep blocks) */}
         {!isPrayer && onToggleComplete && (
-          <button
+          <button 
             onClick={() => onToggleComplete(index)}
-            className="flex-shrink-0 w-5 h-5 rounded-full border flex items-center justify-center transition-all duration-200 hover:scale-110 cursor-pointer"
-            style={{
-              borderColor: item.completed ? "var(--gold)" : "var(--line)",
-              background: item.completed ? "var(--gold)" : "transparent",
-              color: item.completed ? "var(--paper)" : "transparent",
-            }}
-            aria-label={item.completed ? "إلغاء الإنجاز" : "تحديد كمنجز"}
+            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all duration-300 cursor-pointer ml-4 ${
+              item.completed
+                ? "bg-[var(--gold)] border-[var(--gold)] shadow-inner scale-110"
+                : "border-[var(--line)] bg-[var(--paper)] hover:border-[var(--gold)] hover:scale-110"
+            }`}
+            aria-label={item.completed ? "تحديد كغير منجزة" : "تحديد كمنجزة"}
           >
-            <Check size={12} className={item.completed ? "opacity-100" : "opacity-0"} />
+            {item.completed && <Check size={14} style={{ color: "var(--paper)" }} />}
           </button>
         )}
 
         {/* Icon */}
         <div
-          className="flex-shrink-0 p-1.5 rounded-md"
-          style={{
-            background: isPrayer ? "var(--accent-glow)" : "transparent",
+          className="w-10 h-10 rounded-full border-2 flex items-center justify-center shrink-0 ml-4"
+          style={{ 
+            background: isColored ? "transparent" : "var(--paper)", 
+            borderColor: isColored ? "var(--paper)" : "var(--line)",
+            color: isColored ? "var(--paper)" : (isPrayer ? "var(--gold)" : "var(--ink)") 
           }}
         >
           <Icon
-            size={17}
-            style={{ color: isPrayer ? "var(--gold)" : "var(--ink)" }}
+            size={18}
           />
         </div>
 
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div
-            className={`text-base font-bold truncate transition-all duration-300 ${
-              item.completed ? "line-through opacity-60 decoration-gold/40" : ""
+            className={`text-base font-bold truncate transition-all duration-300 smooth-strikethrough ${
+              item.completed ? "is-completed opacity-60" : ""
             }`}
           >
             {item.label}
           </div>
           {item.sub && (
-            <div className="text-xs truncate" style={{ color: "var(--ink-soft)" }}>
+            <div className={`text-xs truncate ${isColored ? "opacity-80" : ""}`} style={{ color: subColor }}>
               {item.sub}
             </div>
           )}
@@ -154,12 +173,28 @@ export default function TimelineCard({
               )}
             </div>
 
-            {/* Mobile: 3 dots menu */}
-            <div className="sm:hidden relative flex items-center" ref={menuRef}>
+            {/* Mobile Actions: Timer (Standalone) + 3 dots menu */}
+            <div className="sm:hidden relative flex items-center gap-1" ref={menuRef}>
+              {/* Standalone Timer Button for Mobile */}
+              {isStudy && onStartTimer && (
+                <button
+                  onClick={() => onStartTimer(item.label)}
+                  className="p-2 rounded-full border hover:scale-105 transition-all cursor-pointer shadow-sm"
+                  style={{ 
+                    background: isColored ? "rgba(255,255,255,0.1)" : "var(--paper)", 
+                    borderColor: isColored ? "rgba(255,255,255,0.3)" : "var(--line)", 
+                    color: isColored ? "var(--paper)" : "var(--gold)" 
+                  }}
+                  aria-label="ابدأ مؤقت التركيز"
+                >
+                  <Timer size={16} />
+                </button>
+              )}
+
               <button
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                style={{ color: "var(--ink-soft)" }}
+                className="p-1.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                style={{ color: isColored ? "var(--paper)" : "var(--ink-soft)" }}
                 aria-label="خيارات المهمة"
               >
                 <MoreVertical size={18} />
@@ -170,15 +205,6 @@ export default function TimelineCard({
                   className="absolute left-0 top-full mt-2 w-32 rounded-lg border shadow-lg flex flex-col overflow-hidden animate-fade-in-up"
                   style={{ background: "var(--card)", borderColor: "var(--line)", zIndex: 100 }}
                 >
-                  {isStudy && onStartTimer && (
-                    <button
-                      onClick={() => { onStartTimer(item.label); setIsMenuOpen(false); }}
-                      className="flex items-center gap-2 px-3 py-2 text-sm text-right hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-                      style={{ color: "var(--gold)" }}
-                    >
-                      <Timer size={14} /> بدء المؤقت
-                    </button>
-                  )}
                   {onEdit && (
                     <button
                       onClick={() => { onEdit(index); setIsMenuOpen(false); }}
@@ -208,7 +234,6 @@ export default function TimelineCard({
           style={{ color: isPrayer ? "var(--gold)" : "var(--ink)" }}
         >
           {formatTimeArabic(item.startTime)}
-        </div>
       </div>
     </div>
   );
