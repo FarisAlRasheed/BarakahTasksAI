@@ -101,6 +101,7 @@ export default function TimelineCard({
         borderColor: borderColor,
         color: cardColor,
         minHeight: `${minHeight}px`,
+        zIndex: isMenuOpen ? 50 : 1,
       }}
       dir="rtl"
     >
